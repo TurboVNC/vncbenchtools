@@ -1,14 +1,14 @@
-# $Id: Makefile,v 1.1.1.1 2008-07-15 23:08:11 dcommander Exp $
+# $Id: Makefile,v 1.2 2008-07-17 18:54:02 dcommander Exp $
 
 INSTDIR = /usr/local/bin
 
 CC = gcc
-CFLAGS = -O2 -I/usr/include
-LDFLAGS = -lz
+CFLAGS = -O2 -m32 -I/usr/include
+LDFLAGS = -lz -O2 -m32 -ljpeg -lturbojpeg
 
 PROG = compare-encodings
-OBJS = compare-encodings.o misc.o hextile.o zlib.o tight.o
-SRCS = compare-encodings.c misc.c hextile.c zlib.c tight.c
+OBJS = compare-encodings.o misc.o hextile.o zlib.o tight.o translate.o
+SRCS = compare-encodings.c misc.c hextile.c zlib.c tight.c translate.c
 
 default: $(PROG)
 
@@ -29,8 +29,9 @@ depend: $(SRCS)
 
 # DO NOT DELETE
 
-compare-encodings.o: rfb.h rfbproto.h
+compare-encodings.o: rfb.h rfbproto.h hextiled.c zlibd.c
 misc.o: rfb.h rfbproto.h
 hextile.o: rfb.h rfbproto.h
 zlib.o: rfb.h rfbproto.h
 tight.o: rfb.h rfbproto.h
+translate.o: rfb.h rfbproto.h tableinittctemplate.c tabletranstemplate.c
