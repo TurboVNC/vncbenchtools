@@ -24,6 +24,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 #include "rfb.h"
 
 static Bool sendHextiles8(rfbClientPtr cl, int x, int y, int w, int h);
