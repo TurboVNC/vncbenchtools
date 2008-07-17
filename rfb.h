@@ -27,6 +27,9 @@ typedef unsigned char  CARD8;
 typedef unsigned short CARD16;
 typedef unsigned long  CARD32;
 
+#define CONCAT2(a,b) a##b
+#define CONCAT2E(a,b) CONCAT2(a,b)
+
 #include "rfbproto.h"
 
 #define MAX_ENCODINGS 10
@@ -34,6 +37,8 @@ typedef unsigned long  CARD32;
 typedef int BOOL, Bool;
 #define FALSE  0
 #define TRUE   1
+#define False  0
+#define True   1
 
 #define xalloc malloc
 #define xrealloc realloc
@@ -50,7 +55,7 @@ typedef struct
     int height;
     int sizeInBytes;
     int bitsPerPixel;
-    char pfbMemory[1024*768*4];
+    char pfbMemory[1280*1024*4];
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -88,6 +93,8 @@ typedef struct rfbClientRec {
     /* For the zlib encoding, necessary compression state info per client. */
     struct z_stream_s compStream;
     Bool compStreamInited;
+
+    int zsLevel[4];
 
 } rfbClientRec, *rfbClientPtr;
 
@@ -128,6 +135,13 @@ extern char updateBuf[UPDATE_BUF_SIZE];
 extern int ublen;
 
 extern Bool rfbSendUpdateBuf(rfbClientPtr cl);
+
+/*
+ * This must be big enough to hold a single 1280x1024 raw rectangle
+ */
+#define SEND_BUF_SIZE (5*1024*1024)
+extern char *sendBuf;
+extern int sblen, sbptr;
 
 /* translate.c */
 
@@ -183,3 +197,5 @@ extern void InitEverything (int color_depth);
 extern int rfbLog (char *fmt, ...);
 
 extern Bool rfbSendRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
+
+extern Bool ReadFromRFBServer(char *out, unsigned int n);
