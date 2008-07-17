@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.2 2008-07-17 18:54:02 dcommander Exp $
+# $Id: Makefile,v 1.3 2008-07-17 18:57:43 dcommander Exp $
 
 INSTDIR = /usr/local/bin
 
@@ -29,7 +29,7 @@ depend: $(SRCS)
 
 # DO NOT DELETE
 
-compare-encodings.o: rfb.h rfbproto.h hextiled.c zlibd.c
+compare-encodings.o: rfb.h rfbproto.h hextiled.c zlibd.c tightd.c
 misc.o: rfb.h rfbproto.h
 hextile.o: rfb.h rfbproto.h
 zlib.o: rfb.h rfbproto.h
