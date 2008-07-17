@@ -1,7 +1,8 @@
 /*  RawUpdates2ppm -- an utility to convert ``raw'' files saved with
  *    the fbs-dump utility to separate 24-bit ppm files.
- *  $Id: compare-encodings.c,v 1.1.1.1 2008-07-15 23:08:12 dcommander Exp $
+ *  $Id: compare-encodings.c,v 1.2 2008-07-17 18:07:36 dcommander Exp $
  *  Copyright (C) 2000 Const Kaplinsky <const@ce.cctpu.edu.ru>
+ *  Copyright (C) 2008 Sun Microsystems, Inc.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -29,8 +30,177 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <netinet/in.h>
+#include <string.h>
+#include <limits.h>
 
 #include "rfb.h"
+
+
+#define BUFFER_SIZE (1024*512)
+static char buffer[BUFFER_SIZE];
+
+#define GET_PIXEL8(pix, ptr) ((pix) = *(ptr)++)
+
+#define GET_PIXEL16(pix, ptr) (((CARD8*)&(pix))[0] = *(ptr)++, \
+			       ((CARD8*)&(pix))[1] = *(ptr)++)
+
+#define GET_PIXEL32(pix, ptr) (((CARD8*)&(pix))[0] = *(ptr)++, \
+			       ((CARD8*)&(pix))[1] = *(ptr)++, \
+			       ((CARD8*)&(pix))[2] = *(ptr)++, \
+			       ((CARD8*)&(pix))[3] = *(ptr)++)
+
+/* The zlib encoding requires expansion/decompression/deflation of the
+   compressed data in the "buffer" above into another, result buffer.
+   However, the size of the result buffer can be determined precisely
+   based on the bitsPerPixel, height and width of the rectangle.  We
+   allocate this buffer one time to be the full size of the buffer. */
+
+static int raw_buffer_size = -1;
+static char *raw_buffer;
+
+static z_stream decompStream;
+static Bool decompStreamInited = False;
+
+/*
+ * Variables for the ``tight'' encoding implementation.
+ */
+
+/* Separate buffer for compressed data. */
+#define ZLIB_BUFFER_SIZE 512
+static char zlib_buffer[ZLIB_BUFFER_SIZE];
+
+/* Four independent compression streams for zlib library. */
+static z_stream zlibStream[4];
+static Bool zlibStreamActive[4] = {
+  False, False, False, False
+};
+
+/* Filter stuff. Should be initialized by filter initialization code. */
+static Bool cutZeros;
+static int rectWidth, rectColors;
+static char tightPalette[256*4];
+static CARD8 tightPrevRow[2048*3*sizeof(CARD16)];
+
+/* JPEG decoder state. */
+static Bool jpegError;
+
+#include <jpeglib.h>
+#include <turbojpeg.h>
+
+tjhandle tjhnd=NULL;
+
+/*
+ * JPEG source manager functions for JPEG decompression in Tight decoder.
+ */
+
+static struct jpeg_source_mgr jpegSrcManager;
+static JOCTET *jpegBufferPtr;
+static size_t jpegBufferLen;
+
+static void
+JpegInitSource(j_decompress_ptr cinfo)
+{
+  jpegError = False;
+}
+
+static boolean
+JpegFillInputBuffer(j_decompress_ptr cinfo)
+{
+  jpegError = True;
+  jpegSrcManager.bytes_in_buffer = jpegBufferLen;
+  jpegSrcManager.next_input_byte = (JOCTET *)jpegBufferPtr;
+
+  return TRUE;
+}
+
+static void
+JpegSkipInputData(j_decompress_ptr cinfo, long num_bytes)
+{
+  if (num_bytes < 0 || num_bytes > jpegSrcManager.bytes_in_buffer) {
+    jpegError = True;
+    jpegSrcManager.bytes_in_buffer = jpegBufferLen;
+    jpegSrcManager.next_input_byte = (JOCTET *)jpegBufferPtr;
+  } else {
+    jpegSrcManager.next_input_byte += (size_t) num_bytes;
+    jpegSrcManager.bytes_in_buffer -= (size_t) num_bytes;
+  }
+}
+
+static void
+JpegTermSource(j_decompress_ptr cinfo)
+{
+  /* No work necessary here. */
+}
+
+static void
+JpegSetSrcManager(j_decompress_ptr cinfo, CARD8 *compressedData,
+		  int compressedLen)
+{
+  jpegBufferPtr = (JOCTET *)compressedData;
+  jpegBufferLen = (size_t)compressedLen;
+
+  jpegSrcManager.init_source = JpegInitSource;
+  jpegSrcManager.fill_input_buffer = JpegFillInputBuffer;
+  jpegSrcManager.skip_input_data = JpegSkipInputData;
+  jpegSrcManager.resync_to_restart = jpeg_resync_to_restart;
+  jpegSrcManager.term_source = JpegTermSource;
+  jpegSrcManager.next_input_byte = jpegBufferPtr;
+  jpegSrcManager.bytes_in_buffer = jpegBufferLen;
+
+  cinfo->src = &jpegSrcManager;
+}
+
+static long
+ReadCompactLen (void)
+{
+  long len;
+  CARD8 b;
+
+  if (!ReadFromRFBServer((char *)&b, 1))
+    return -1;
+  len = (int)b & 0x7F;
+  if (b & 0x80) {
+    if (!ReadFromRFBServer((char *)&b, 1))
+      return -1;
+    len |= ((int)b & 0x7F) << 7;
+    if (b & 0x80) {
+      if (!ReadFromRFBServer((char *)&b, 1))
+	return -1;
+      len |= ((int)b & 0xFF) << 14;
+    }
+  }
+  return len;
+}
+
+#define myFormat rfbClient.format
+#define BPP 8
+#include "hextiled.c"
+#include "zlibd.c"
+#include "tightd.c"
+#undef BPP
+#define BPP 16
+#include "hextiled.c"
+#include "zlibd.c"
+#include "tightd.c"
+#undef BPP
+#define BPP 32
+#include "hextiled.c"
+#include "zlibd.c"
+#include "tightd.c"
+#undef BPP
+
+#define TIGHT_STATISTICS
+#ifdef TIGHT_STATISTICS
+extern unsigned long solidrect, solidpixels, monorect, monopixels, ndxrect, ndxpixels, jpegrect, jpegpixels, gradrect, gradpixels, fcrect, fcpixels;
+#endif
+
+
+double gettime(void)
+{
+  struct timeval tv;
+  gettimeofday(&tv, (struct timezone *)NULL);
+  return((double)tv.tv_sec+(double)tv.tv_usec*0.000001);
+}
 
 #define SAVE_PATH  "./ppm"
 /* #define SAVE_PPM_FILES */
@@ -44,7 +214,8 @@
 
 static int color_depth = 16;
 static int sum_raw = 0, sum_tight = 0, sum_hextile = 0, sum_zlib = 0;
-
+static double t0, ttight[2]={0.,0.}, thextile[2]={0.,0.}, tzlib[2]={0.,0.};
+static int tndx = 0;
 
 static void show_usage (char *program_name);
 static int do_convert (FILE *in);
@@ -72,41 +243,51 @@ static void do_compare (char *data, int w, int h);
 
 static int total_updates;
 static int total_rects;
+static int tightonly = 0;
+int decompress = 0;
 
 int main (int argc, char *argv[])
 {
   FILE *in;
-  int max_argc = 2;
-  char buf[12];
+  int i;
+  char buf[12], *filename = NULL;
   int err;
 
-  if (argc > 1) {
-    if (strcmp (argv[1], "-8") == 0) {
-      color_depth = 8;
-      max_argc++;
-    } else if (strcmp (argv[1], "-16") == 0) {
-      color_depth = 16;
-      max_argc++;
-    } else if (strcmp (argv[1], "-24") == 0) {
-      color_depth = 24;
-      max_argc++;
-    } else if (argv[1][0] == '-') {
-      show_usage (argv[0]);
-      return 1;
-    }
-  }
-
-  if (argc > max_argc) {
+  if (argc < 2) {
     show_usage (argv[0]);
     return 1;
   }
 
-  in = (argc == max_argc) ? fopen (argv[argc - 1], "r") : stdin;
+  for (i = 0; i < argc; i++) {
+    if (strcmp (argv[i], "-8") == 0) {
+      color_depth = 8;
+    } else if (strcmp (argv[i], "-16") == 0) {
+      color_depth = 16;
+    } else if (strcmp (argv[i], "-24") == 0) {
+      color_depth = 24;
+    } else if (strcmp (argv[i], "-to") == 0) {
+      tightonly = 1;
+    } else if (strcmp (argv[i], "-d") == 0) {
+      decompress = 1;
+    } else filename = argv[i];
+  }
+
+  in = filename ? fopen (filename, "r") : stdin;
   if (in == NULL) {
     perror ("Cannot open input file");
     return 1;
   }
 
+  err = (do_convert (in) != 0);
+  sleep(5);
+  fseek(in, 0, SEEK_SET);
+  sum_raw = sum_hextile = sum_zlib = sum_tight = 0;
+	#ifdef TIGHT_STATISTICS
+  fcrect = ndxrect = jpegrect = monorect = solidrect = 0;
+  fcpixels = ndxpixels = jpegpixels = monopixels = solidpixels = 0;
+  #endif
+  decompStreamInited = False;
+  for(i = 0; i < 4; i++) zlibStreamActive[i] = False;
   err = (do_convert (in) != 0);
 
   if (in != stdin)
@@ -193,15 +374,35 @@ static int do_convert (FILE *in)
     msg_type = getc (in);
   }
 
+  if(tightonly) sum_raw=sum_hextile=sum_zlib=INT_MAX;
+
   printf ("\nGrand totals:\n"
-          "                                raw  | hextile |  zlib  |  tight\n"
-          "                            ---------+---------+--------+--------\n"
-          "Bytes in all rectangles:    %9d|%9d|%8d|%8d\n"
-          "Tight/XXX bandwidth saving: %8.2f%%|%8.2f%%|%7.2f%%|\n",
+          "                               raw    |  hextile  |   zlib   |  tight  \n"
+          "                            ----------+-----------+----------+---------\n"
+          "Bytes in all rectangles:    %9d | %9d | %8d | %8d\n"
+          "Tight/XXX bandwidth saving: %8.2f%% | %8.2f%% | %7.2f%% |\n",
           sum_raw, sum_hextile, sum_zlib, sum_tight,
           (double)(sum_raw - sum_tight) * 100 / (double) sum_raw,
           (double)(sum_hextile - sum_tight) * 100 / (double) sum_hextile,
           (double)(sum_zlib - sum_tight) * 100 / (double) sum_zlib);
+  printf ("%scoding time:              ......... | %8.4fs | %7.4fs | %7.4fs\n",
+          decompress? "De":"En", thextile[tndx], tzlib[tndx], ttight[tndx]);
+
+  #ifdef TIGHT_STATISTICS
+  printf("Solid rectangles = %lu, pixels = %f mil\n", solidrect, (double)solidpixels/1000000.);
+  printf("Mono rectangles  = %lu, pixels = %f mil\n", monorect, (double)monopixels/1000000.);
+  printf("Index rectangles = %lu, pixels = %f mil\n", ndxrect, (double)ndxpixels/1000000.);
+  printf("JPEG rectangles  = %lu, pixels = %f mil\n", jpegrect, (double)jpegpixels/1000000.);
+  printf("Grad rectangles  = %lu, pixels = %f mil\n", gradrect, (double)gradpixels/1000000.);
+  printf("Raw rectangles   = %lu, pixels = %f mil\n", fcrect, (double)fcpixels/1000000.);
+  #endif
+
+  printf("\n");
+  if(tndx==1)
+  printf ("Avg. %scoding time:         ......... | %8.4fs | %7.4fs | %7.4fs\n\n",
+          decompress? "De":"En", (thextile[0]+thextile[1])/2.,
+          (tzlib[0]+tzlib[1])/2., (ttight[0]+ttight[1])/2.);
+  tndx++;
 
   return (ferror (in)) ? -1 : 0;
 }
@@ -244,7 +445,7 @@ static int parse_fb_update (FILE *in)
         return -1;
       }
     } else {
-      fprintf (stderr, "Wrong encoding: 0x%02lX.\n", enc);
+      fprintf (stderr, "Wrong encoding: 0x%02lX=%d.\n", enc, enc);
       return -1;
     }
     total_rects++;
@@ -266,7 +467,7 @@ static int parse_ht_rectangle (FILE *in, int xpos, int ypos,
 {
   char fname[80];
   FILE *ppm;
-  int err;
+  int err, i;
   int pixel_bytes;
 
   switch (color_depth) {
@@ -301,30 +502,175 @@ static int parse_ht_rectangle (FILE *in, int xpos, int ypos,
 #endif
 
   rfbClient.rfbBytesSent[rfbEncodingHextile] = 0;
+  rfbClient.rfbRectanglesSent[rfbEncodingHextile] = 0;
   rfbClient.rfbBytesSent[rfbEncodingZlib] = 0;
+  rfbClient.rfbRectanglesSent[rfbEncodingZlib] = 0;
   rfbClient.rfbBytesSent[rfbEncodingTight] = 0;
+  rfbClient.rfbRectanglesSent[rfbEncodingTight] = 0;
 
+  if(!tightonly) {
+
+  sblen = sbptr = 0;
+  if(!decompress) t0 = gettime();
   if (!rfbSendRectEncodingHextile(&rfbClient, 0, 0, width, height)) {
-      fprintf (stderr, "Error!.\n");
+      fprintf (stderr, "Error in hextile encoder!\n");
       return -1;
   }
+  if(!rfbSendUpdateBuf(&rfbClient)) {
+    fprintf(stderr, "Could not flush output buffer\n");
+    return -1;
+  }
+  if(!decompress) thextile[tndx] += gettime() - t0;
+  if(decompress) {
+    for (i = 0; i < rfbClient.rfbRectanglesSent[rfbEncodingHextile]; i++) {
+      rfbFramebufferUpdateRectHeader rect;
+      if (!ReadFromRFBServer((char *)&rect, sz_rfbFramebufferUpdateRectHeader)) {
+        fprintf(stderr, "Could not read rectangle header.\n");
+        return -1;
+      }
+      rect.encoding = Swap32IfLE(rect.encoding);
+      rect.r.x = Swap16IfLE(rect.r.x);
+      rect.r.y = Swap16IfLE(rect.r.y);
+      rect.r.w = Swap16IfLE(rect.r.w);
+      rect.r.h = Swap16IfLE(rect.r.h);
+      if (rect.encoding == rfbEncodingHextile) {
+        t0 = gettime();
+        switch (color_depth) {
+        case 8:
+          err = HandleHextile8 (rect.r.x, rect.r.y, rect.r.w, rect.r.h);  break;
+        case 16:
+          err = HandleHextile16 (rect.r.x, rect.r.y, rect.r.w, rect.r.h);  break;
+        default:
+          err = HandleHextile32 (rect.r.x, rect.r.y, rect.r.w, rect.r.h);  break;
+        }
+        if (!err) {
+          fprintf (stderr, "Error in hextile decoder!\n");
+          return -1;
+        }
+        thextile[tndx] += gettime() - t0;
+      }
+			else {
+        printf("Non-hextile rectangle encountered!\n");
+        return -1;
+      }
+    }
+    if(sbptr != sblen) {
+      printf("ERROR: incomplete decode of hextile-encoded rectangles.\n");
+      return -1;
+    }
+  }
 
+  sblen = sbptr = 0;
+  if(!decompress) t0 = gettime();
   if (!rfbSendRectEncodingZlib(&rfbClient, 0, 0, width, height)) {
-      fprintf (stderr, "Error!.\n");
+      fprintf (stderr, "Error in zlib encoder!.\n");
       return -1;
   }
+  if(!rfbSendUpdateBuf(&rfbClient)) {
+    fprintf(stderr, "Could not flush output buffer\n");
+    return -1;
+  }
+  if(!decompress) tzlib[tndx] += gettime() - t0;
+  if(decompress) {
+    for (i = 0; i < rfbClient.rfbRectanglesSent[rfbEncodingZlib]; i++) {
+      rfbFramebufferUpdateRectHeader rect;
+      if (!ReadFromRFBServer((char *)&rect, sz_rfbFramebufferUpdateRectHeader)) {
+        fprintf(stderr, "Could not read rectangle header.\n");
+        return -1;
+      }
+      rect.encoding = Swap32IfLE(rect.encoding);
+      rect.r.x = Swap16IfLE(rect.r.x);
+      rect.r.y = Swap16IfLE(rect.r.y);
+      rect.r.w = Swap16IfLE(rect.r.w);
+      rect.r.h = Swap16IfLE(rect.r.h);
+      if (rect.encoding == rfbEncodingZlib) {
+        t0 = gettime();
+        switch (color_depth) {
+        case 8:
+          err = HandleZlib8 (rect.r.x, rect.r.y, rect.r.w, rect.r.h);  break;
+        case 16:
+          err = HandleZlib16 (rect.r.x, rect.r.y, rect.r.w, rect.r.h);  break;
+        default:
+          err = HandleZlib32 (rect.r.x, rect.r.y, rect.r.w, rect.r.h);  break;
+        }
+        if (!err) {
+          fprintf (stderr, "Error in zlib decoder!\n");
+          return -1;
+        }
+        tzlib[tndx] += gettime() - t0;
+      }
+			else {
+        printf("Non-zlib rectangle encountered!\n");
+        return -1;
+      }
+    }
+    if(sbptr != sblen) {
+      printf("ERROR: incomplete decode of zlib-encoded data.\n");
+      return -1;
+    }
+  }
 
+  }
+
+  sblen = sbptr = 0;
+  
+  if(!decompress) t0 = gettime();
   if (!rfbSendRectEncodingTight(&rfbClient, 0, 0, width, height)) {
-      fprintf (stderr, "Error!.\n");
+      fprintf (stderr, "Error in tight encoder!.\n");
       return -1;
   }
+  if(!rfbSendUpdateBuf(&rfbClient)) {
+    fprintf(stderr, "Could not flush output buffer\n");
+    return -1;
+  }
+  if(!decompress) ttight[tndx] += gettime() - t0;
+  if(decompress) {
+    for (i = 0; i < rfbClient.rfbRectanglesSent[rfbEncodingTight]; i++) {
+      rfbFramebufferUpdateRectHeader rect;
+      if (!ReadFromRFBServer((char *)&rect, sz_rfbFramebufferUpdateRectHeader)) {
+        fprintf(stderr, "Could not read rectangle header.\n");
+        return -1;
+      }
+      rect.encoding = Swap32IfLE(rect.encoding);
+      rect.r.x = Swap16IfLE(rect.r.x);
+      rect.r.y = Swap16IfLE(rect.r.y);
+      rect.r.w = Swap16IfLE(rect.r.w);
+      rect.r.h = Swap16IfLE(rect.r.h);
+      if (rect.encoding == rfbEncodingTight) {
+        t0 = gettime();
+        switch (color_depth) {
+        case 8:
+          err = HandleTight8 (rect.r.x, rect.r.y, rect.r.w, rect.r.h);  break;
+        case 16:
+          err = HandleTight16 (rect.r.x, rect.r.y, rect.r.w, rect.r.h);  break;
+        default:
+          err = HandleTight32 (rect.r.x, rect.r.y, rect.r.w, rect.r.h);  break;
+        }
+        if (!err) {
+          fprintf (stderr, "Error in tight decoder!\n");
+          return -1;
+        }
+        ttight[tndx] += gettime() - t0;
+      }
+			else {
+        printf("Non-tight rectangle encountered!\n");
+        return -1;
+      }
+    }
+    if(sbptr != sblen) {
+      printf("ERROR: incomplete decode of tight-encoded data.\n");
+      return -1;
+    }
+  }
 
+#if 0
   printf ("%05d-%04d (%4d,%3d %4d*%3d): %7d|%7d|%6d|%6d\n",
           total_updates, rect_no, xpos, ypos, width, height,
           width * height * pixel_bytes + 12,
           rfbClient.rfbBytesSent[rfbEncodingHextile],
           rfbClient.rfbBytesSent[rfbEncodingZlib],
           rfbClient.rfbBytesSent[rfbEncodingTight]);
+#endif
 
   sum_raw += width * height * pixel_bytes + 12;
   sum_hextile += rfbClient.rfbBytesSent[rfbEncodingHextile];
