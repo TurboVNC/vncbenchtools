@@ -289,7 +289,7 @@ rfbSetTranslateFunction(cl)
 
 	/* otherwise we use three separate tables for red, green and blue */
 
-      printf("TranslateFn = rfbTranslateWidhRGBTablesFns[%d][%d]\n",
+      printf("TranslateFn = rfbTranslateWithRGBTablesFns[%d][%d]\n",
              rfbServerFormat.bitsPerPixel / 16,
              cl->format.bitsPerPixel / 16);
 
