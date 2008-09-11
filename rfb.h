@@ -59,6 +59,15 @@ typedef struct
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
+typedef struct
+{
+  int width, height;
+  char *data;
+  int bytes_per_line;
+  int bits_per_pixel;
+} XImage;
+
+
 /*
  * Per-client structure.
  */

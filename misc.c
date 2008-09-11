@@ -31,6 +31,8 @@ rfbClientRec rfbClient;
 rfbScreenInfo rfbScreen;
 rfbPixelFormat rfbServerFormat;
 
+XImage _image, *image=&_image;
+
 void InitEverything (int color_depth)
 {
   int i;
@@ -117,6 +119,12 @@ void InitEverything (int color_depth)
   }
 
   ublen = 0;
+
+  image->width = 1280;
+  image->height = 1024;
+  image->bits_per_pixel = rfbClient.format.bitsPerPixel;
+  image->bytes_per_line = ((image->width * image->bits_per_pixel) + 3) & (~3);
+  image->data = (char *)malloc(image->width * image->bytes_per_line);
 }
 
 extern int decompress;

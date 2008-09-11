@@ -1,6 +1,6 @@
 /*  RawUpdates2ppm -- an utility to convert ``raw'' files saved with
  *    the fbs-dump utility to separate 24-bit ppm files.
- *  $Id: compare-encodings.c,v 1.2 2008-07-17 18:07:36 dcommander Exp $
+ *  $Id: compare-encodings.c,v 1.3 2008-09-11 00:15:01 dcommander Exp $
  *  Copyright (C) 2000 Const Kaplinsky <const@ce.cctpu.edu.ru>
  *  Copyright (C) 2008 Sun Microsystems, Inc.
  *
@@ -38,6 +38,9 @@
 
 #define BUFFER_SIZE (1024*512)
 static char buffer[BUFFER_SIZE];
+
+static char *compressedData = NULL;
+static char *uncompressedData = NULL;
 
 #define GET_PIXEL8(pix, ptr) ((pix) = *(ptr)++)
 
