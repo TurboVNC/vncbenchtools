@@ -289,8 +289,8 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
             tparam[i].ublen = &tparam[i]._ublen;
             tparam[i].id = i;
         }
-        printf("Using %d thread%s for Tight encoding\n", nt,
-            nt == 1 ? "" : "s");
+        printf("Using %d thread%s for Tight encoding\n", _nt,
+            _nt == 1 ? "" : "s");
         firsttime = 0;
     }
 
@@ -856,7 +856,7 @@ SendMonoRect(t, w, h)
     threadparam *t;
     int w, h;
 {
-    int streamId = 1;
+    int streamId = t->id;
     int paletteLen, dataLen;
     rfbClientPtr cl = t->cl;
 
@@ -870,7 +870,7 @@ SendMonoRect(t, w, h)
     dataLen = (w + 7) / 8;
     dataLen *= h;
 
-    if (tightConf[compressLevel].monoZlibLevel == 0 || t->id != 0)
+    if (tightConf[compressLevel].monoZlibLevel == 0 || t->id > 3)
         t->updateBuf[(*t->ublen)++] = (char)((rfbTightNoZlib | rfbTightExplicitFilter) << 4);
     else
         t->updateBuf[(*t->ublen)++] = (streamId | rfbTightExplicitFilter) << 4;
@@ -925,7 +925,7 @@ SendIndexedRect(t, w, h)
     threadparam *t;
     int w, h;
 {
-    int streamId = 2;
+    int streamId = t->id;
     int i, entryLen;
     rfbClientPtr cl = t->cl;
 
@@ -936,7 +936,7 @@ SendIndexedRect(t, w, h)
             return FALSE;
 
     /* Prepare tight encoding header. */
-    if (tightConf[compressLevel].idxZlibLevel == 0 || t->id != 0)
+    if (tightConf[compressLevel].idxZlibLevel == 0 || t->id > 3)
         t->updateBuf[(*t->ublen)++] = (char)((rfbTightNoZlib | rfbTightExplicitFilter) << 4);
     else
         t->updateBuf[(*t->ublen)++] = (streamId | rfbTightExplicitFilter) << 4;
@@ -991,7 +991,7 @@ SendFullColorRect(t, w, h)
     threadparam *t;
     int w, h;
 {
-    int streamId = 0;
+    int streamId = t->id;
     int len;
     rfbClientPtr cl = t->cl;
 
@@ -1000,7 +1000,7 @@ SendFullColorRect(t, w, h)
     if (!CheckUpdateBuf(t, TIGHT_MIN_TO_COMPRESS + 1))
         return FALSE;
 
-    if (tightConf[compressLevel].rawZlibLevel == 0 || t->id != 0)
+    if (tightConf[compressLevel].rawZlibLevel == 0 || t->id > 3)
         t->updateBuf[(*t->ublen)++] = (char)(rfbTightNoZlib << 4);
     else
         t->updateBuf[(*t->ublen)++] = 0x00;  /* stream id = 0, flushing, no filter */
@@ -1039,7 +1039,7 @@ CompressData(t, streamId, dataLen, zlibLevel, zlibStrategy)
        as long as the client is connected, or performance suffers.  Thus,
        Zlib compression can't be multi-threaded, and it must be disabled for
        threads other than 0. */
-    if (zlibLevel == 0 || t->id != 0)
+    if (zlibLevel == 0 || t->id > 3)
         return SendCompressedData (t, t->tightBeforeBuf, dataLen);
 
     pz = &cl->zsStruct[streamId];
