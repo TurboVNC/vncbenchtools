@@ -1,6 +1,6 @@
 /*  RawUpdates2ppm -- an utility to convert ``raw'' files saved with
  *    the fbs-dump utility to separate 24-bit ppm files.
- *  $Id: compare-encodings.c,v 1.3 2008-09-11 00:15:01 dcommander Exp $
+ *  $Id: compare-encodings.c,v 1.4 2010-01-30 08:27:02 dcommander Exp $
  *  Copyright (C) 2000 Const Kaplinsky <const@ce.cctpu.edu.ru>
  *  Copyright (C) 2008 Sun Microsystems, Inc.
  *
@@ -32,9 +32,13 @@
 #include <netinet/in.h>
 #include <string.h>
 #include <limits.h>
+#include <errno.h>
 
 #include "rfb.h"
 
+#ifndef min
+ #define min(a,b) ((a)<(b)?(a):(b))
+#endif
 
 #define BUFFER_SIZE (1024*512)
 static char buffer[BUFFER_SIZE];
@@ -628,6 +632,12 @@ static int parse_ht_rectangle (FILE *in, int xpos, int ypos,
   }
   if(!decompress) ttight[tndx] += gettime() - t0;
   if(decompress) {
+    #ifdef __TURBOD_MT__
+    if (!threadInit) {
+      InitThreads();
+      if (!threadInit) return False;
+    }
+    #endif
     for (i = 0; i < rfbClient.rfbRectanglesSent[rfbEncodingTight]; i++) {
       rfbFramebufferUpdateRectHeader rect;
       if (!ReadFromRFBServer((char *)&rect, sz_rfbFramebufferUpdateRectHeader)) {
