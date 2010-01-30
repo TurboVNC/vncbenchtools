@@ -543,7 +543,7 @@ DecompressJpegRectBPP(int x, int y, int w, int h)
 {
   int compressedLen;
   char *dstptr;
-  int ps, flags=0;
+  int ps, pitch, flags=0;
 
   compressedLen = (int)ReadCompactLen();
   if (compressedLen <= 0) {
@@ -574,11 +574,44 @@ DecompressJpegRectBPP(int x, int y, int w, int h)
     flags|=TJ_BGR;
   if(myFormat.bigEndian) flags^=TJ_BGR;
 
-  dstptr=&image->data[image->bytes_per_line*y+x*ps];
-  if(tjDecompress(tjhnd, (unsigned char *)compressedData, (unsigned long)compressedLen,
-    (unsigned char *)dstptr, w, image->bytes_per_line, h, ps, flags)==-1) {
+  if(ps==2) {
+    flags=0;
+    ps=3;
+    pitch=w*ps;
+    uncompressedData=(char *)realloc(uncompressedData, pitch*h);
+    if(uncompressedData==NULL) {
+      fprintf(stderr, "Memory allocation error.\n");
+      return False;
+    }
+    dstptr=uncompressedData;
+  }
+  else {
+    pitch=image->bytes_per_line;
+    dstptr=&image->data[pitch*y+x*ps];
+  }
+
+  if(tjDecompress(tjhnd, (unsigned char *)compressedData,
+    (unsigned long)compressedLen, (unsigned char *)dstptr, w,
+    pitch, h, ps, flags)==-1) {
     fprintf(stderr, "TurboJPEG error: %s\n", tjGetErrorStr());
     return False;
+  }
+
+  ps=image->bits_per_pixel/8;
+  pitch=image->bytes_per_line;
+  dstptr=&image->data[pitch*y+x*ps];
+
+  if(ps==2) {
+    CARD16 *dst=(CARD16 *)dstptr, *dst2;
+    char *src=uncompressedData;
+    int i, j;
+
+    for(j=0; j<h; j++) {
+      for(i=0, dst2=dst; i<w; i++, dst2++, src+=3) {
+        *dst2 = RGB24_TO_PIXEL(BPP, src[0], src[1], src[2]);
+      }
+      dst+=pitch/ps;
+    }
   }
 
 /*  if (!appData.doubleBuffer)
