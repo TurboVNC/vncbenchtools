@@ -1,6 +1,6 @@
 /*  RawUpdates2ppm -- an utility to convert ``raw'' files saved with
  *    the fbs-dump utility to separate 24-bit ppm files.
- *  $Id: compare-encodings.c,v 1.4 2010-01-30 08:27:02 dcommander Exp $
+ *  $Id: compare-encodings.c,v 1.5 2010-02-01 08:26:58 dcommander Exp $
  *  Copyright (C) 2000 Const Kaplinsky <const@ce.cctpu.edu.ru>
  *  Copyright (C) 2008 Sun Microsystems, Inc.
  *
@@ -674,6 +674,13 @@ static int parse_ht_rectangle (FILE *in, int xpos, int ypos,
       printf("ERROR: incomplete decode of tight-encoded data.\n");
       return -1;
     }
+
+    #ifdef __TURBOD_MT__
+    for (i = 1; i < nt; i++) {
+      pthread_mutex_lock(&tparam[i].done);
+      pthread_mutex_unlock(&tparam[i].done);
+    }
+    #endif
   }
 
 #if 0
