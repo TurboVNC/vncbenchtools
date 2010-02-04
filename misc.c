@@ -159,7 +159,7 @@ int rfbLog (char *fmt, ...)
 {
   va_list arglist;
   va_start(arglist, fmt);
-  printf(fmt, arglist);
+  vfprintf(stdout, fmt, arglist);
   return 0;
 }
 
