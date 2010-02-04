@@ -1,6 +1,6 @@
 /*  RawUpdates2ppm -- an utility to convert ``raw'' files saved with
  *    the fbs-dump utility to separate 24-bit ppm files.
- *  $Id: compare-encodings.c,v 1.5 2010-02-01 08:26:58 dcommander Exp $
+ *  $Id: compare-encodings.c,v 1.6 2010-02-04 09:45:42 dcommander Exp $
  *  Copyright (C) 2000 Const Kaplinsky <const@ce.cctpu.edu.ru>
  *  Copyright (C) 2008 Sun Microsystems, Inc.
  *
@@ -250,6 +250,7 @@ static void do_compare (char *data, int w, int h);
 
 static int total_updates;
 static int total_rects;
+static unsigned long total_pixels;
 static int tightonly = 0;
 int decompress = 0;
 
@@ -327,6 +328,7 @@ static int do_convert (FILE *in)
 
   total_updates = 0;
   total_rects = 0;
+  total_pixels = 0;
 
   printf ("upd.no -                              Bytes per rectangle:\n"
           "   rect.no   coords     size       raw |hextile| zlib | tight\n"
@@ -404,6 +406,8 @@ static int do_convert (FILE *in)
   printf("Raw rectangles   = %lu, pixels = %f mil\n", fcrect, (double)fcpixels/1000000.);
   #endif
 
+  printf("Avg. pixel count for %lu FB updates:  %f\n", total_rects,
+	 (double)total_pixels/(double)total_rects);
   printf("\n");
   if(tndx==1)
   printf ("Avg. %scoding time:         ......... | %8.4fs | %7.4fs | %7.4fs\n\n",
@@ -438,6 +442,7 @@ static int parse_fb_update (FILE *in)
     ypos = get_CARD16 (buf + 2);
     width = get_CARD16 (buf + 4);
     height = get_CARD16 (buf + 6);
+    total_pixels += width * height;
 
     /* 16 bits, hextile encoding only */
     enc = get_CARD32 (buf + 8);
