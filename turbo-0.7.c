@@ -132,6 +132,8 @@ typedef struct _threadparam {
     int streamId, baseStreamId, nStreams;
     pthread_mutex_t ready, done;
     Bool status, deadyet;
+    unsigned long solidrect, solidpixels, monorect, monopixels, ndxrect,
+        ndxpixels, jpegrect, jpegpixels, fcrect, fcpixels;
 } threadparam;
 
 static threadparam tparam[TVNC_MAXTHREADS];
@@ -380,6 +382,11 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
             else tparam[i].nStreams = 4 / n;
             tparam[i].streamId = tparam[i].baseStreamId;
         }
+        tparam[i].solidrect=tparam[i].solidpixels=0;
+        tparam[i].monorect=tparam[i].monopixels=0;
+        tparam[i].ndxrect=tparam[i].ndxpixels=0;
+        tparam[i].jpegrect=tparam[i].jpegpixels=0;
+        tparam[i].fcrect=tparam[i].fcpixels=0;
     }
     if (nt > 1) {
         for (i = 1; i < nt; i++) pthread_mutex_unlock(&tparam[i].ready);
@@ -412,6 +419,18 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
             cl->rfbBytesSent[rfbEncodingTight] += tparam[i].bytessent;
             cl->rfbRectanglesSent[rfbEncodingTight] += tparam[i].rectsent;
         }
+    }
+    for (i = 0; i < nt; i++) {
+        solidrect+=tparam[i].solidrect;
+        solidpixels+=tparam[i].solidpixels;
+        monorect+=tparam[i].monorect;
+        monopixels+=tparam[i].monopixels;
+        ndxrect+=tparam[i].ndxrect;
+        ndxpixels+=tparam[i].ndxpixels;
+        jpegrect+=tparam[i].jpegrect;
+        jpegpixels+=tparam[i].jpegpixels;
+        fcrect+=tparam[i].fcrect;
+        fcpixels+=tparam[i].fcpixels;
     }
 
     return status;
@@ -527,7 +546,7 @@ SendRectEncodingTight(t, x, y, w, h)
                                    &cl->format, fbptr, t->tightBeforeBuf,
                                    rfbScreen.paddedWidthInBytes, 1, 1);
 
-                solidrect++;  solidpixels+=w*h;
+                t->solidrect++;  t->solidpixels+=w*h;
                 if (!SendSolidRect(t))
                     return FALSE;
 
@@ -912,7 +931,7 @@ SendMonoRect(t, w, h)
     int paletteLen, dataLen;
     rfbClientPtr cl = t->cl;
 
-    monorect++;  monopixels+=w*h;
+    t->monorect++;  t->monopixels+=w*h;
 
     if (!CheckUpdateBuf(t, TIGHT_MIN_TO_COMPRESS + 6 +
           2 * cl->format.bitsPerPixel / 8))
@@ -987,7 +1006,7 @@ SendIndexedRect(t, w, h)
     int i, entryLen;
     rfbClientPtr cl = t->cl;
 
-    ndxrect++;  ndxpixels+=w*h;
+    t->ndxrect++;  t->ndxpixels+=w*h;
 
     if (!CheckUpdateBuf(t, TIGHT_MIN_TO_COMPRESS + 6 +
           t->paletteNumColors * cl->format.bitsPerPixel / 8))
@@ -1059,7 +1078,7 @@ SendFullColorRect(t, w, h)
     int len;
     rfbClientPtr cl = t->cl;
 
-    fcrect++;  fcpixels+=w*h;
+    t->fcrect++;  t->fcpixels+=w*h;
 
     if (!CheckUpdateBuf(t, TIGHT_MIN_TO_COMPRESS + 1))
         return FALSE;
@@ -1650,7 +1669,7 @@ SendJpegRect(t, x, y, w, h, quality)
     if (rfbServerFormat.bitsPerPixel == 8)
         return SendFullColorRect(t, w, h);
 
-    jpegrect++;  jpegpixels+=w*h;
+    t->jpegrect++;  t->jpegpixels+=w*h;
 
     if(ps<2) {
       rfbLog("Error: JPEG requires 16-bit, 24-bit, or 32-bit pixel format.\n");
