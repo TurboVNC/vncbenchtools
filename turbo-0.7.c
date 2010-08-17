@@ -85,7 +85,7 @@ static int qualityLevel = 95;
 static int subsampLevel = 0;
 
 static const int subsampLevel2tjsubsamp[4] = {
-    TJ_444, TJ_411, TJ_422, TJ_GRAYSCALE
+    TJ_444, TJ_420, TJ_422, TJ_GRAYSCALE
 };
 
 /* Stuff dealing with palettes. */
@@ -293,6 +293,8 @@ ShutdownTightThreads(void)
         tparam[i].deadyet = TRUE;
         pthread_mutex_unlock(&tparam[i].ready);
         pthread_join(thnd[i], NULL);
+        pthread_mutex_destroy(&tparam[i].ready);
+        pthread_mutex_destroy(&tparam[i].done);
       }
     }
   }
@@ -404,8 +406,9 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
         }
         if (status == FALSE) return FALSE;
         if (ublen > 0) {
-            if (!rfbSendUpdateBuf(cl))
+            if (!rfbSendUpdateBuf(cl)) {
                 return FALSE;
+            }
         }
         for (i = 1; i < nt; i++) {
             if ((*tparam[i].ublen) > 0 && decompress) {
