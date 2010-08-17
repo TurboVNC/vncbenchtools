@@ -1,8 +1,9 @@
 /*  RawUpdates2ppm -- an utility to convert ``raw'' files saved with
  *    the fbs-dump utility to separate 24-bit ppm files.
- *  $Id: compare-encodings.c,v 1.6 2010-02-04 09:45:42 dcommander Exp $
+ *  $Id: compare-encodings.c,v 1.7 2010-08-17 05:37:39 dcommander Exp $
  *  Copyright (C) 2000 Const Kaplinsky <const@ce.cctpu.edu.ru>
  *  Copyright (C) 2008 Sun Microsystems, Inc.
+ *  Copyright (C) 2010 D. R. Commander
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -228,16 +229,18 @@ static void show_usage (char *program_name);
 static int do_convert (FILE *in);
 static int parse_fb_update (FILE *in);
 
-static int parse_ht_rectangle (FILE *in, int xpos, int ypos,
-                               int width, int height, int rect_no);
-static int parse_raw_rectangle (FILE *in, int xpos, int ypos,
-                                int width, int height, int rect_no);
+static int parse_rectangle (FILE *in, int xpos, int ypos,
+                            int width, int height, int rect_no, int enc);
 
 static int save_rectangle (FILE *ppm, int width, int height, int depth);
 
 static int handle_hextile8 (FILE *in, int width, int height);
 static int handle_hextile16 (FILE *in, int width, int height);
 static int handle_hextile32 (FILE *in, int width, int height);
+
+static int handle_raw8 (FILE *in, int x, int y, int width, int height);
+static int handle_raw16 (FILE *in, int x, int y, int width, int height);
+static int handle_raw32 (FILE *in, int x, int y, int width, int height);
 
 static void copy_data (char *data, int rw, int rh,
                        int x, int y, int w, int h, int bpp);
@@ -444,22 +447,8 @@ static int parse_fb_update (FILE *in)
     height = get_CARD16 (buf + 6);
     total_pixels += width * height;
 
-    /* 16 bits, hextile encoding only */
     enc = get_CARD32 (buf + 8);
-    if (enc == 5) {
-      if (parse_ht_rectangle (in, xpos, ypos, width, height, i) != 0) {
-        fprintf (stderr, "Error parsing rectangle.\n");
-        return -1;
-      }
-    } else if (enc == 0) {
-      if (parse_raw_rectangle (in, xpos, ypos, width, height, i) != 0) {
-        fprintf (stderr, "Error parsing rectangle.\n");
-        return -1;
-      }
-    } else {
-      fprintf (stderr, "Wrong encoding: 0x%02lX=%d.\n", enc, enc);
-      return -1;
-    }
+    parse_rectangle(in, xpos, ypos, width, height, i, enc);
     total_rects++;
   }
   total_updates++;
@@ -467,37 +456,49 @@ static int parse_fb_update (FILE *in)
   return 0;
 }
 
-static int parse_raw_rectangle (FILE *in, int xpos, int ypos,
-                                int width, int height, int rect_no)
-{
-  fprintf (stderr, "! Raw encoding...\n");
-  return 0;
-}
-
-static int parse_ht_rectangle (FILE *in, int xpos, int ypos,
-                               int width, int height, int rect_no)
+static int parse_rectangle (FILE *in, int xpos, int ypos,
+                            int width, int height, int rect_no, int enc)
 {
   char fname[80];
   FILE *ppm;
   int err, i;
   int pixel_bytes;
 
-  switch (color_depth) {
-  case 8:
-    err = handle_hextile8 (in, width, height);
-    pixel_bytes = 1;
-    break;
-  case 16:
-    err = handle_hextile16 (in, width, height);
-    pixel_bytes = 2;
-    break;
-  default:                      /* 24 */
-    err = handle_hextile32 (in, width, height);
-    pixel_bytes = 4;
+  if (enc == 5) {
+    switch (color_depth) {
+    case 8:
+      err = handle_hextile8 (in, width, height);
+      pixel_bytes = 1;
+      break;
+    case 16:
+      err = handle_hextile16 (in, width, height);
+      pixel_bytes = 2;
+      break;
+    default:                      /* 24 */
+      err = handle_hextile32 (in, width, height);
+      pixel_bytes = 4;
+    }
+  } else if (enc == 0) {
+    switch (color_depth) {
+    case 8:
+      err = handle_raw8 (in, xpos, ypos, width, height);
+      pixel_bytes = 1;
+      break;
+    case 16:
+      err = handle_raw16 (in, xpos, ypos, width, height);
+      pixel_bytes = 2;
+      break;
+    default:                      /* 24 */
+      err = handle_raw32 (in, xpos, ypos, width, height);
+      pixel_bytes = 4;
+    }
+  } else {
+    fprintf (stderr, "Wrong encoding: 0x%02lX=%d.\n", enc, enc);
+    return -1;
   }
 
   if (err != 0) {
-    fprintf (stderr, "Error decoding hextile rectangle.\n");
+    fprintf (stderr, "Error decoding rectangle.\n");
     return -1;
   }
 
@@ -710,6 +711,7 @@ static int save_rectangle (FILE *ppm, int width, int height, int depth)
   CARD8 *data8 = (CARD8 *) rfbScreen.pfbMemory;
   CARD16 *data16 = (CARD16 *) rfbScreen.pfbMemory;
   CARD32 *data32 = (CARD32 *) rfbScreen.pfbMemory;
+
   int i, r, g, b;
 
   fprintf (ppm, "P6\n%d %d\n255\n", width, height);
@@ -757,6 +759,35 @@ static int save_rectangle (FILE *ppm, int width, int height, int depth)
 
   return 1;
 }
+
+/*
+ * Decoding raw rectangles.
+ */
+
+#define DEFINE_HANDLE_RAW(bpp)                                             \
+                                                                           \
+static int handle_raw##bpp (FILE *in, int x, int y, int width, int height) \
+{                                                                          \
+  char *data = NULL;                                                       \
+                                                                           \
+  if ((data = malloc(width * height * (bpp / 8))) == NULL) {               \
+    fprintf (stderr, "Memory allocation error.\n");                        \
+    return -1;                                                             \
+  }                                                                        \
+                                                                           \
+  if (fread (data, 1, width * height * (bpp / 8), in)                      \
+    != width * height * (bpp / 8)) {                                       \
+    fprintf (stderr, "Read error.\n");                                     \
+    return -1;                                                             \
+  }                                                                        \
+                                                                           \
+  copy_data ((char *)data, width, height, x, y, width, height, bpp);       \
+  return 0;                                                                \
+}
+
+DEFINE_HANDLE_RAW(8)
+DEFINE_HANDLE_RAW(16)
+DEFINE_HANDLE_RAW(32)
 
 /*
  * Decoding hextile rectangles.
