@@ -25,7 +25,7 @@
 
 typedef unsigned char  CARD8;
 typedef unsigned short CARD16;
-typedef unsigned long  CARD32;
+typedef unsigned int   CARD32;
 
 #define CONCAT2(a,b) a##b
 #define CONCAT2E(a,b) CONCAT2(a,b)
