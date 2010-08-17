@@ -52,6 +52,7 @@ typedef struct _threadparam
   z_streamp zs;
   int rectColors;
   char tightPalette[256*4];
+  int rects;
 } threadparam;
 
 static threadparam tparam[TVNC_MAXTHREADS];
@@ -61,8 +62,11 @@ static int curthread = 0;
 static int
 nthreads(void)
 {
+  char *mtenv = getenv("TVNC_MT");
   char *ntenv = getenv("TVNC_NTHREADS");
   int np = sysconf(_SC_NPROCESSORS_CONF), nt = 0;
+  if (!mtenv || strlen(mtenv) < 1 || strcmp(mtenv, "1"))
+    return 1;
   if (np == -1) np = 1;
   np = min(np, TVNC_MAXTHREADS);
   if (ntenv && strlen(ntenv) > 0) nt = atoi(ntenv);
@@ -78,6 +82,7 @@ TightThreadFunc(void *param)
     pthread_mutex_lock(&t->ready);
     if (t->deadyet) break;
     t->status = t->decompFn(t, t->x, t->y, t->w, t->h);
+    if(t->status == True) t->rects++;
     pthread_mutex_unlock(&t->done);
   }
   return NULL;
@@ -90,8 +95,9 @@ InitThreads(void)
   if (threadInit) return;
 
   nt = nthreads();
-  fprintf(stderr, "Using %d thread%s for Tight decoding\n", nt,
-    nt == 1 ? "" : "s");
+  if(nt > 1)
+    fprintf(stderr, "Using %d thread%s for Tight decoding\n", nt,
+      nt == 1 ? "" : "s");
   memset(tparam, 0, sizeof(threadparam)*TVNC_MAXTHREADS);
 
   for (i = 0; i < nt; i++) {
@@ -303,7 +309,10 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
       pthread_mutex_unlock(&t->ready);
       return True;
     }
-    else return DecompressJpegRectBPP(t, rx, ry, rw, rh);
+    else {
+      t->rects++;
+      return DecompressJpegRectBPP(t, rx, ry, rw, rh);
+    }
   }
 #endif
 
@@ -386,7 +395,10 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
       pthread_mutex_unlock(&t->ready);
       return True;
     }
-    else return DecompressZlibRectBPP(t, rx, ry, rw, rh);
+    else {
+      t->rects++;
+      return DecompressZlibRectBPP(t, rx, ry, rw, rh);
+    }
   }
 
   /* Now let's initialize compression stream if needed. */
@@ -450,7 +462,10 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
     pthread_mutex_unlock(&t->ready);
     return True;
   }
-  else return DecompressZlibRectBPP(t, rx, ry, rw, rh);
+  else {
+    t->rects++;
+    return DecompressZlibRectBPP(t, rx, ry, rw, rh);
+  }
 }
 
 /*----------------------------------------------------------------------------
