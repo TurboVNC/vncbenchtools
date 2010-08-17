@@ -1,6 +1,6 @@
 /*  RawUpdates2ppm -- an utility to convert ``raw'' files saved with
  *    the fbs-dump utility to separate 24-bit ppm files.
- *  $Id: compare-encodings.c,v 1.7 2010-08-17 05:37:39 dcommander Exp $
+ *  $Id: compare-encodings.c,v 1.8 2010-08-17 06:11:39 dcommander Exp $
  *  Copyright (C) 2000 Const Kaplinsky <const@ce.cctpu.edu.ru>
  *  Copyright (C) 2008 Sun Microsystems, Inc.
  *  Copyright (C) 2010 D. R. Commander
@@ -782,6 +782,7 @@ static int handle_raw##bpp (FILE *in, int x, int y, int width, int height) \
   }                                                                        \
                                                                            \
   copy_data ((char *)data, width, height, x, y, width, height, bpp);       \
+  free(data);                                                              \
   return 0;                                                                \
 }
 
