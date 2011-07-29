@@ -127,6 +127,10 @@ static void Pack24(char *buf, rfbPixelFormat *fmt, int count);
 static Bool SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h,
                          int quality);
 
+unsigned long solidrect=0, solidpixels=0, monorect=0, monopixels=0, ndxrect=0,
+	ndxpixels=0, jpegrect=0, jpegpixels=0, fcrect=0, fcpixels=0, gradrect=0,
+	gradpixels=0;
+
 /*
  * Tight encoding implementation.
  */
@@ -273,6 +277,7 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
                                    &cl->format, fbptr, tightBeforeBuf,
                                    rfbScreen.paddedWidthInBytes, 1, 1);
 
+                solidrect++;  solidpixels+=w*h;
                 if (!SendSolidRect(cl))
                     return FALSE;
 
@@ -591,6 +596,8 @@ SendFullColorRect(cl, w, h)
     int streamId = 0;
     int len;
 
+    fcrect++;  fcpixels+=w*h;
+
     if (ublen + TIGHT_MIN_TO_COMPRESS + 1 > UPDATE_BUF_SIZE) {
         if (!rfbSendUpdateBuf(cl))
             return FALSE;
@@ -754,6 +761,8 @@ SendJpegRect(cl, x, y, w, h, quality)
     int subsamp=compressLevel2subsamp[compressLevel];
     unsigned long size;
     int flags=0;
+
+    jpegrect++;  jpegpixels+=w*h;
 
     if (ps < 3) {
       rfbLog("Error: Server must be run with 24-bit or 32-bit depth\n");  return 0;
