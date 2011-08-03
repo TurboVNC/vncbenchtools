@@ -19,10 +19,10 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-#include "tiger-1.1/rdr/InStream.h"
-#include "tiger-1.1/rdr/OutStream.h"
-#include "tiger-1.1/rfb/PixelFormat.h"
-#include "tiger-1.1/rfb/util.h"
+#include "tiger-1.2/rdr/InStream.h"
+#include "tiger-1.2/rdr/OutStream.h"
+#include "tiger-1.2/rfb/PixelFormat.h"
+#include "tiger-1.2/rfb/util.h"
 
 #ifdef _WIN32
 #define strcasecmp _stricmp

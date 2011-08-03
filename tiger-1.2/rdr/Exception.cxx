@@ -18,7 +18,7 @@
  * USA.
  */
 
-#include "tiger-1.1/rdr/Exception.h"
+#include "tiger-1.2/rdr/Exception.h"
 
 #include <string.h>
 #include <stdarg.h>
