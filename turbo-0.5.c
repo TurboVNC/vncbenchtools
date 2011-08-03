@@ -317,7 +317,7 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
                                    &cl->format, fbptr, tightBeforeBuf,
                                    rfbScreen.paddedWidthInBytes, 1, 1);
 
-                solidrect++;  solidpixels+=w*h;
+                solidrect++;  solidpixels+=w_best*h_best;
                 if (!SendSolidRect(cl))
                     return FALSE;
 
@@ -620,6 +620,7 @@ SendSubrect(cl, x, y, w, h)
         break;
     case 1:
         /* Solid rectangle */
+        solidrect++;  solidpixels+=w*h;
         success = SendSolidRect(cl);
         break;
     case 2:
