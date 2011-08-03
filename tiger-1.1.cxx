@@ -79,7 +79,6 @@ static const TIGHT_CONF conf[10] = {
   { 65536, 2048,  24, 9, 9, 7,  64, 92, SUBSAMP_NONE }, // 8
   { 65536, 2048,  32, 9, 9, 9,  96,100, SUBSAMP_NONE }  // 9
 };
-static const int defaultCompressLevel = 6;
 
 static const int compressLevel = 6;
 static const int qualityLevel = 8;
