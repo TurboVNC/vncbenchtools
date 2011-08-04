@@ -135,7 +135,7 @@ bool writeRect(const Rect& r, const PixelFormat& pf)
 
   // Copy members of current TightEncoder instance to static variables.
   s_pconf = pconf = &conf[compressLevel];
-  s_pjconf = &conf[qualityLevel];
+  if (qualityLevel >= 0) s_pjconf = &conf[qualityLevel];
 
   // Encode small rects as is.
   bool rectTooBig = w > pconf->maxRectWidth || w * h > pconf->maxRectSize;
