@@ -40,6 +40,7 @@ namespace rfb {
     unsigned int monoMinRectSize;
     int idxZlibLevel, monoZlibLevel, rawZlibLevel;
     int idxMaxColorsDivisor;
+    int palMaxColorsWithJPEG;
     int jpegQuality;
     subsampEnum jpegSubSample;
   };

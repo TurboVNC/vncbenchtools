@@ -45,7 +45,6 @@ namespace rfb {
 #define SWAP_PIXEL CONCAT2E(SWAP,BPP)
 #define HASH_FUNCTION CONCAT2E(HASH_FUNC,BPP)
 #define PACK_PIXELS CONCAT2E(packPixels,BPP)
-#define DETECT_SMOOTH_IMAGE CONCAT2E(detectSmoothImage,BPP)
 #define ENCODE_SOLID_RECT CONCAT2E(encodeSolidRect,BPP)
 #define ENCODE_FULLCOLOR_RECT CONCAT2E(encodeFullColorRect,BPP)
 #define ENCODE_MONO_RECT CONCAT2E(encodeMonoRect,BPP)
@@ -318,7 +317,7 @@ void TIGHT_ENCODE (const Rect& r, rdr::OutStream *os,
     s_palNumColors = 1;
   else {
     s_palMaxColors = r.area() / s_pconf->idxMaxColorsDivisor;
-    if (s_pjconf != NULL) s_palMaxColors = 24;
+    if (s_pjconf != NULL) s_palMaxColors = s_pconf->palMaxColorsWithJPEG;
     if (s_palMaxColors < 2 && r.area() >= s_pconf->monoMinRectSize) {
       s_palMaxColors = 2;
     }
@@ -743,7 +742,6 @@ bool CHECK_SOLID_TILE(Rect& r, CARD32 *colorPtr, bool needSameColor)
 #undef SWAP_PIXEL
 #undef HASH_FUNCTION
 #undef PACK_PIXELS
-#undef DETECT_SMOOTH_IMAGE
 #undef ENCODE_SOLID_RECT
 #undef ENCODE_FULLCOLOR_RECT
 #undef ENCODE_MONO_RECT

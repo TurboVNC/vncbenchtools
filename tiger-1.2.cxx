@@ -35,9 +35,6 @@ using namespace rfb;
 
 // Adjustable parameters.
 // FIXME: Get rid of #defines
-#define TIGHT_JPEG_MIN_RECT_SIZE     1024
-#define TIGHT_DETECT_MIN_WIDTH          8
-#define TIGHT_DETECT_MIN_HEIGHT         8
 #define TIGHT_MAX_SPLIT_TILE_SIZE      16
 #define TIGHT_MIN_SPLIT_RECT_SIZE    4096
 #define TIGHT_MIN_SOLID_SUBRECT_SIZE 2048
@@ -47,10 +44,10 @@ using namespace rfb;
 // encoder parameters for each of 10 compression levels (0..9).
 // Last three parameters correspond to JPEG quality levels (0..9).
 //
-// NOTE: s_conf[9].maxRectSize should be >= s_conf[i].maxRectSize,
-// where i in [0..8]. RequiredBuffSize() method depends on this.
-// FIXME: Is this comment obsolete?
-//
+// NOTE: The parameters used in this encoder are the result of painstaking
+// research by The VirtualGL Project using RFB session captures from a variety
+// of both 2D and 3D applications.  See http://www.VirtualGL.org for the full
+// reports.
 
 // NOTE:  The JPEG quality and subsampling levels below were obtained
 // experimentally by the VirtualGL Project.  They represent the approximate
@@ -71,19 +68,19 @@ using namespace rfb;
 // 0 = JPEG quality 15,  4:2:0 subsampling (ratio ~= 100:1)
 
 static const TIGHT_CONF conf[10] = {
-  {   512,   32,   6, 0, 0, 0,   4, 15, SUBSAMP_420 }, // 0
-  {  2048,   64,   6, 1, 1, 1,   8, 29, SUBSAMP_420 }, // 1
-  {  4096,  128,   8, 3, 3, 2,  24, 41, SUBSAMP_420 }, // 2
-  {  8192,  256,  12, 5, 5, 2,  32, 42, SUBSAMP_422 }, // 3
-  { 16384,  512,  12, 6, 7, 3,  32, 62, SUBSAMP_422 }, // 4
-  { 32768,  512,  12, 7, 8, 4,  32, 77, SUBSAMP_422 }, // 5
-  { 65536, 1024,  16, 7, 8, 5,  32, 79, SUBSAMP_NONE }, // 6
-  { 65536, 1024,  16, 8, 9, 6,  64, 86, SUBSAMP_NONE }, // 7
+  { 65536, 2048,   6, 0, 0, 0,   4, 15, SUBSAMP_420 }, // 0
+  { 65536, 2048,   6, 1, 1, 1,   8, 29, SUBSAMP_420 }, // 1
+  { 65536, 2048,   8, 3, 3, 2,  24, 41, SUBSAMP_420 }, // 2
+  { 65536, 2048,  12, 5, 5, 2,  32, 42, SUBSAMP_422 }, // 3
+  { 65536, 2048,  12, 6, 7, 3,  32, 62, SUBSAMP_422 }, // 4
+  { 65536, 2048,  12, 7, 8, 4,  32, 77, SUBSAMP_422 }, // 5
+  { 65536, 2048,  16, 7, 8, 5,  32, 79, SUBSAMP_NONE }, // 6
+  { 65536, 2048,  16, 8, 9, 6,  64, 86, SUBSAMP_NONE }, // 7
   { 65536, 2048,  24, 9, 9, 7,  64, 92, SUBSAMP_NONE }, // 8
-  { 65536, 2048,  32, 1, 1, 1,  96,100, SUBSAMP_NONE }  // 9
+  { 65536, 2048,  32, 9, 9, 9,  96,100, SUBSAMP_NONE }  // 9
 };
 
-static const int compressLevel = 9;
+static const int compressLevel = 1;
 static const int qualityLevel = 8;
 
 static const TIGHT_CONF* s_pconf;
