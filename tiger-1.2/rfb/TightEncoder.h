@@ -20,6 +20,7 @@
 
 #include "../rdr/MemOutStream.h"
 #include "../rdr/ZlibOutStream.h"
+#include "JpegCompressor.h"
 
 // FIXME: Check if specifying extern "C" is really necessary.
 #include <stdio.h>
@@ -29,12 +30,6 @@ extern "C" {
 
 namespace rfb {
 
-  enum subsampEnum {
-    SUBSAMP_NONE,
-    SUBSAMP_422,
-    SUBSAMP_420
-  };
-
   struct TIGHT_CONF {
     unsigned int maxRectSize, maxRectWidth;
     unsigned int monoMinRectSize;
@@ -42,7 +37,7 @@ namespace rfb {
     int idxMaxColorsDivisor;
     int palMaxColorsWithJPEG;
     int jpegQuality;
-    subsampEnum jpegSubSample;
+    JPEG_SUBSAMP jpegSubSample;
   };
 
 }

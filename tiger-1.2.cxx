@@ -19,6 +19,7 @@
 #include "tiger-1.2/rfb/encodings.h"
 #include "tiger-1.2/rfb/TightEncoder.h"
 #include "tiger-1.2/rdr/ZlibOutStream.cxx"
+#include "tiger-1.2/rfb/JpegCompressor.cxx"
 #include "tiger-1.2/rfb/PixelFormat.cxx"
 #include "tiger-1.2/rfb/Rect.h"
 #include "tiger-1.2/rdr/Exception.h"
@@ -87,6 +88,7 @@ static const TIGHT_CONF* s_pconf;
 static const TIGHT_CONF* s_pjconf;
 static rdr::MemOutStream mos;
 static rdr::ZlibOutStream *zos = NULL;
+static JpegCompressor jc;
 static rfbClientPtr cl = NULL;
 static rdr::U8* imageBuf = NULL;
 static int imageBufSize = 0;
@@ -358,11 +360,11 @@ void writeSubrect(const Rect& r, const PixelFormat& pf,
 
   switch (cl->format.bitsPerPixel) {
   case 8:
-    tightEncode8(r, &mos, zos, imageBuf, pf, forceSolid);  break;
+    tightEncode8(r, &mos, zos, jc, imageBuf, pf, forceSolid);  break;
   case 16:
-    tightEncode16(r, &mos, zos, imageBuf, pf, forceSolid); break;
+    tightEncode16(r, &mos, zos, jc, imageBuf, pf, forceSolid); break;
   case 32:
-    tightEncode32(r, &mos, zos, imageBuf, pf, forceSolid); break;
+    tightEncode32(r, &mos, zos, jc, imageBuf, pf, forceSolid); break;
   }
 
   rfbFramebufferUpdateRectHeader rect;
