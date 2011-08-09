@@ -92,7 +92,7 @@ JpegCompressor::JpegCompressor(int bufferLen) : MemOutStream(bufferLen)
 
   if(setjmp(err.jmpBuffer)) {
     // this will execute if libjpeg has an error
-    throw Exception(err.lastError);
+    throw rdr::Exception(err.lastError);
   }
 
   jpeg_create_compress(&cinfo);
@@ -128,7 +128,7 @@ void JpegCompressor::compress(rdr::U8 *buf, const Rect& r,
     jpeg_abort_compress(&cinfo);
     if (srcBufIsTemp && srcBuf) delete[] srcBuf;
     if (rowPointer) delete[] rowPointer;
-    throw Exception(err.lastError);
+    throw rdr::Exception(err.lastError);
   }
 
   cinfo.image_width = w;
@@ -211,5 +211,5 @@ void JpegCompressor::compress(rdr::U8 *buf, const Rect& r,
 
 void JpegCompressor::writeBytes(const void* data, int length)
 {
-  throw Exception("writeBytes() is not valid with a JpegCompressor instance.  Use compress() instead.");
+  throw rdr::Exception("writeBytes() is not valid with a JpegCompressor instance.  Use compress() instead.");
 }
