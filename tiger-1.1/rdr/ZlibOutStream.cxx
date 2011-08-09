@@ -1,4 +1,5 @@
 /* Copyright (C) 2002-2005 RealVNC Ltd.  All Rights Reserved.
+ * Copyright (C) 2011 D. R. Commander.  All Rights Reserved.
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,7 +28,8 @@ enum { DEFAULT_BUF_SIZE = 16384 };
 
 ZlibOutStream::ZlibOutStream(OutStream* os, int bufSize_, int compressLevel)
   : underlying(os), compressionLevel(compressLevel), newLevel(compressLevel),
-    bufSize(bufSize_ ? bufSize_ : DEFAULT_BUF_SIZE), offset(0)
+    bufSize(bufSize_ ? bufSize_ : DEFAULT_BUF_SIZE), offset(0),
+    newBehavior(false)
 {
   zs = new z_stream;
   zs->zalloc    = Z_NULL;
@@ -39,6 +41,8 @@ ZlibOutStream::ZlibOutStream(OutStream* os, int bufSize_, int compressLevel)
   }
   ptr = start = new U8[bufSize];
   end = start + bufSize;
+  const char *version = zlibVersion();
+  if (strcmp(version, "1.2.3") > 0) newBehavior = true;
 }
 
 ZlibOutStream::~ZlibOutStream()
@@ -77,6 +81,9 @@ void ZlibOutStream::flush()
 
 //    fprintf(stderr,"zos flush: avail_in %d\n",zs->avail_in);
 
+  if (!underlying)
+    throw Exception("ZlibOutStream: underlying OutStream has not been set");
+
   while (zs->avail_in != 0) {
 
     do {
@@ -87,8 +94,10 @@ void ZlibOutStream::flush()
 //        fprintf(stderr,"zos flush: calling deflate, avail_in %d, avail_out %d\n",
 //                zs->avail_in,zs->avail_out);
       checkCompressionLevel();
-      int rc = deflate(zs, Z_SYNC_FLUSH);
-      if (rc != Z_OK) throw Exception("ZlibOutStream: deflate failed");
+      if (zs->avail_in != 0) {
+        int rc = deflate(zs, Z_SYNC_FLUSH);
+        if (rc != Z_OK) throw Exception("ZlibOutStream: deflate failed");
+      }
 
 //        fprintf(stderr,"zos flush: after deflate: %d bytes\n",
 //                zs->next_out-underlying->getptr());
@@ -108,6 +117,9 @@ int ZlibOutStream::overrun(int itemSize, int nItems)
   if (itemSize > bufSize)
     throw Exception("ZlibOutStream overrun: max itemSize exceeded");
 
+  if (!underlying)
+    throw Exception("ZlibOutStream: underlying OutStream has not been set");
+
   while (end - ptr < itemSize) {
     zs->next_in = start;
     zs->avail_in = ptr - start;
@@ -121,8 +133,10 @@ int ZlibOutStream::overrun(int itemSize, int nItems)
 //                zs->avail_in,zs->avail_out);
 
       checkCompressionLevel();
-      int rc = deflate(zs, 0);
-      if (rc != Z_OK) throw Exception("ZlibOutStream: deflate failed");
+      if (zs->avail_in != 0) {
+        int rc = deflate(zs, 0);
+        if (rc != Z_OK) throw Exception("ZlibOutStream: deflate failed");
+      }
 
 //        fprintf(stderr,"zos overrun: after deflate: %d bytes\n",
 //                zs->next_out-underlying->getptr());
@@ -154,6 +168,17 @@ int ZlibOutStream::overrun(int itemSize, int nItems)
 void ZlibOutStream::checkCompressionLevel()
 {
   if (newLevel != compressionLevel) {
+
+    // This is a horrible hack, but after many hours of trying, I couldn't find
+    // a better way to make this class work properly with both Zlib 1.2.3 and
+    // 1.2.5.  1.2.3 does a Z_PARTIAL_FLUSH in the body of deflateParams() if
+    // the compression level has changed, and 1.2.5 does a Z_BLOCK flush.
+
+    if (newBehavior) {
+      int rc = deflate(zs, Z_SYNC_FLUSH);
+      if (rc != Z_OK) throw Exception("ZlibOutStream: deflate failed");
+    }
+
     if (deflateParams (zs, newLevel, Z_DEFAULT_STRATEGY) != Z_OK) {
       throw Exception("ZlibOutStream: deflateParams failed");
     }
