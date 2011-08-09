@@ -88,8 +88,10 @@ void ZlibOutStream::flush()
 //        fprintf(stderr,"zos flush: calling deflate, avail_in %d, avail_out %d\n",
 //                zs->avail_in,zs->avail_out);
       checkCompressionLevel();
-      int rc = deflate(zs, Z_SYNC_FLUSH);
-      if (rc != Z_OK) throw Exception("ZlibOutStream: deflate failed");
+      if (zs->avail_in != 0) {
+        int rc = deflate(zs, Z_SYNC_FLUSH);
+        if (rc != Z_OK) throw Exception("ZlibOutStream: deflate failed");
+      }
 
 //        fprintf(stderr,"zos flush: after deflate: %d bytes\n",
 //                zs->next_out-underlying->getptr());
@@ -121,12 +123,11 @@ int ZlibOutStream::overrun(int itemSize, int nItems)
 //        fprintf(stderr,"zos overrun: calling deflate, avail_in %d, avail_out %d\n",
 //                zs->avail_in,zs->avail_out);
 
-      int rc;
-      if (checkCompressionLevel())
-        rc = deflate(zs, Z_SYNC_FLUSH);
-      else
-        rc = deflate(zs, 0);
-      if (rc != Z_OK) throw Exception("ZlibOutStream: deflate failed");
+     checkCompressionLevel();
+     if (zs->avail_in != 0) {
+       int rc = deflate(zs, 0);
+       if (rc != Z_OK) throw Exception("ZlibOutStream: deflate failed");
+     }
 
 //        fprintf(stderr,"zos overrun: after deflate: %d bytes\n",
 //                zs->next_out-underlying->getptr());
@@ -158,7 +159,6 @@ int ZlibOutStream::overrun(int itemSize, int nItems)
 bool ZlibOutStream::checkCompressionLevel()
 {
   if (newLevel != compressionLevel) {
-    
     if (deflateParams (zs, newLevel, Z_DEFAULT_STRATEGY) != Z_OK) {
       throw Exception("ZlibOutStream: deflateParams failed");
     }
