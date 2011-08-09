@@ -46,7 +46,7 @@ namespace rdr {
   private:
 
     int overrun(int itemSize, int nItems);
-    bool checkCompressionLevel();
+    void checkCompressionLevel();
 
     OutStream* underlying;
     int compressionLevel;
@@ -55,6 +55,7 @@ namespace rdr {
     int offset;
     z_stream_s* zs;
     U8* start;
+    bool newBehavior;
   };
 
 } // end of namespace rdr
