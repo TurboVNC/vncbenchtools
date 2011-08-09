@@ -84,6 +84,7 @@ static const TIGHT_CONF conf[10] = {
 static const int compressLevel = 1;
 static const int qualityLevel = 8;
 
+// FIXME: Not good to mirror TightEncoder's members here.
 static const TIGHT_CONF* s_pconf;
 static const TIGHT_CONF* s_pjconf;
 static rdr::MemOutStream mos;
@@ -222,33 +223,36 @@ void writeSubrect(const Rect&, const PixelFormat&, bool forceSolid = false);
 
 void sendRectSimple(const Rect &r, const PixelFormat& pf)
 {
-  unsigned int dx, dy, sw, sh;
-  Rect sr;
-
   // Shortcuts to rectangle coordinates and dimensions.
   const int x = r.tl.x;
   const int y = r.tl.y;
   const unsigned int w = r.width();
   const unsigned int h = r.height();
 
-  if (w > s_pconf->maxRectWidth || r.area() > s_pconf->maxRectSize) {
+  // Encode small rects as is.
+  bool rectTooBig = w > pconf->maxRectWidth || w * h > pconf->maxRectSize;
+  if (!rectTooBig) {
+    writeSubrect(r, ig);
+    return true;
+  }
 
-    // Compute max sub-rectangle size.
-    const unsigned int subrectMaxWidth =
-      (w > s_pconf->maxRectWidth) ? s_pconf->maxRectWidth : w;
-    const unsigned int subrectMaxHeight =
-      s_pconf->maxRectSize / subrectMaxWidth;
+  // Compute max sub-rectangle size.
+  const unsigned int subrectMaxWidth =
+    (w > s_pconf->maxRectWidth) ? s_pconf->maxRectWidth : w;
+  const unsigned int subrectMaxHeight =
+    s_pconf->maxRectSize / subrectMaxWidth;
 
-    for (dy = 0; dy < h; dy += subrectMaxHeight) {
-      for (dx = 0; dx < w; dx += s_pconf->maxRectWidth) {
-	      sw = (dx + s_pconf->maxRectWidth < w) ? s_pconf->maxRectWidth : w - dx;
-        sh = (dy + subrectMaxHeight < h) ? subrectMaxHeight : h - dy;
-        sr.setXYWH(x + dx, y + dy, sw, sh);
-        writeSubrect(sr, pf);
-      }
+  // Split big rects into separately encoded subrects.
+  Rect sr;
+  unsigned int dx, dy, sw, sh;
+  for (dy = 0; dy < h; dy += subrectMaxHeight) {
+    for (dx = 0; dx < w; dx += s_pconf->maxRectWidth) {
+      sw = (dx + s_pconf->maxRectWidth < w) ? s_pconf->maxRectWidth : w - dx;
+      sh = (dy + subrectMaxHeight < h) ? subrectMaxHeight : h - dy;
+      sr.setXYWH(x + dx, y + dy, sw, sh);
+      writeSubrect(sr, pf);
     }
   }
-  else writeSubrect(r, pf);
 }
 
 bool writeRect(Rect& r, const PixelFormat& pf)
