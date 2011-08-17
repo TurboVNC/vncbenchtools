@@ -525,10 +525,12 @@ void FILL_PALETTE (PIXEL_T *data, int count)
 void FAST_FILL_PALETTE (const Rect& r, PIXEL_T *data, int stride)
 {
   PIXEL_T c0, c1, ci = 0, mask, c0t, c1t, cit;
-  int i, j, i2, j2, n0, n1, ni;
+  int n0, n1, ni;
   int w = r.width(), h = r.height();
+  PIXEL_T *rowptr, *colptr, *rowptr2, *colptr2, *dataend = &data[stride * h];
+  bool willTransform = ig->willTransform();
 
-  if (ig->willTransform()) {
+  if (willTransform) {
     mask = serverpf.redMax << serverpf.redShift;
     mask |= serverpf.greenMax << serverpf.greenShift;
     mask |= serverpf.blueMax << serverpf.blueShift;
@@ -536,15 +538,17 @@ void FAST_FILL_PALETTE (const Rect& r, PIXEL_T *data, int stride)
   else mask = ~0;
 
   c0 = data[0] & mask;
-  for (j = 0; j < h; j++) {
-    for (i = 0; i < w; i++) {
-      if ((data[j * stride + i] & mask) != c0)
+  n0 = 0;
+  for (rowptr = data; rowptr < dataend; rowptr += stride) {
+    for (colptr = rowptr; colptr < &rowptr[w]; colptr++) {
+      if (((*colptr) & mask) != c0)
         goto soliddone;
+      n0++;
     }
   }
 
   soliddone:
-  if (j >= h) {
+  if (rowptr >= dataend) {
     palNumColors = 1;           // Solid rectangle
     return;
   }
@@ -553,13 +557,16 @@ void FAST_FILL_PALETTE (const Rect& r, PIXEL_T *data, int stride)
     return;
   }
 
-  n0 = j * w + i;
-  c1 = data[j * stride + i] & mask;
+  c1 = *colptr & mask;
   n1 = 0;
-  i++;  if (i >= w) {i = 0;  j++;}
-  for (j2 = j; j2 < h; j2++) {
-    for (i2 = i; i2 < w; i2++) {
-      ci = data[j2 * stride + i2] & mask;
+  colptr++;
+  if (colptr >= &rowptr[w]) {
+    rowptr += stride;  colptr = rowptr;
+  }
+  colptr2 = colptr;
+  for (rowptr2 = rowptr; rowptr2 < dataend;) {
+    for (; colptr2 < &rowptr2[w]; colptr2++) {
+      ci = (*colptr2) & mask;
       if (ci == c0) {
         n0++;
       } else if (ci == c1) {
@@ -567,14 +574,20 @@ void FAST_FILL_PALETTE (const Rect& r, PIXEL_T *data, int stride)
       } else
         goto monodone;
     }
-    i = 0;
+    rowptr2 += stride;
+    colptr2 = rowptr2;
   }
 
   monodone:
-  ig->translateRect(&c0, 1, Rect(0, 0, 1, 1), &c0t, 1, Point(0, 0));
-  ig->translateRect(&c1, 1, Rect(0, 0, 1, 1), &c1t, 1, Point(0, 0));
+  if (willTransform) {
+    ig->translateRect(&c0, 1, Rect(0, 0, 1, 1), &c0t, 1, Point(0, 0));
+    ig->translateRect(&c1, 1, Rect(0, 0, 1, 1), &c1t, 1, Point(0, 0));
+  }
+  else {
+    c0t = c0;  c1t = c1;
+  }
 
-  if (j2 >= h) {
+  if (colptr2 >= dataend) {
     if (n0 > n1) {
       monoBackground = (rdr::U32)c0t;
       monoForeground = (rdr::U32)c1t;
@@ -591,20 +604,28 @@ void FAST_FILL_PALETTE (const Rect& r, PIXEL_T *data, int stride)
   paletteInsert (c1t, (rdr::U32)n1, BPP);
 
   ni = 1;
-  i2++;  if (i2 >= w) {i2 = 0;  j2++;}
-  for (j = j2; j < h; j++) {
-    for (i = i2; i < w; i++) {
-      if ((data[j * stride + i] & mask) == ci) {
+  colptr2++;
+  if (colptr2 >= &rowptr2[w]) {
+    rowptr2 += stride;  colptr2 = rowptr2;
+  }
+  colptr = colptr2;
+  for (rowptr = rowptr2; rowptr < dataend;) {
+    for (; colptr < &rowptr[w]; colptr++) {
+      if (((*colptr) & mask) == ci) {
         ni++;
       } else {
-        ig->translateRect(&ci, 1, Rect(0, 0, 1, 1), &cit, 1, Point(0, 0));
+        if (willTransform)
+          ig->translateRect(&ci, 1, Rect(0, 0, 1, 1), &cit, 1, Point(0, 0));
+        else
+          cit = ci;
         if (!paletteInsert (cit, (rdr::U32)ni, BPP))
           return;
-        ci = data[j * stride + i] & mask;
+        ci = (*colptr) & mask;
         ni = 1;
       }
     }
-    i2 = 0;
+    rowptr += stride;
+    colptr = rowptr;
   }
   ig->translateRect(&ci, 1, Rect(0, 0, 1, 1), &cit, 1, Point(0, 0));
   paletteInsert (cit, (rdr::U32)ni, BPP);
