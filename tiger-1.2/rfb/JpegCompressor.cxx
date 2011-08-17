@@ -174,6 +174,7 @@ void JpegCompressor::compress(rdr::U8 *buf, int pitch, const Rect& r,
     srcBuf = new rdr::U8[w * h * pixelsize];
     srcBufIsTemp = true;
     pf.rgbFromBuffer(srcBuf, (const rdr::U8 *)buf, w, pitch, h);
+    pitch = w * pixelsize;
   }
 
   cinfo.input_components = pixelsize;
