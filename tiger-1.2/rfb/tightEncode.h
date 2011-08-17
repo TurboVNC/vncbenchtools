@@ -26,8 +26,6 @@
 // GET_IMAGE_INTO_BUF - gets a rectangle of pixel data into a buffer
 //
 
-#include "../rdr/OutStream.h"
-#include "../rdr/ZlibOutStream.h"
 #include <assert.h>
 
 namespace rfb {
@@ -40,64 +38,20 @@ namespace rfb {
 #endif
 
 #define PIXEL_T rdr::CONCAT2E(U,BPP)
-#define WRITE_PIXEL CONCAT2E(writeOpaque,BPP)
-#define TIGHT_ENCODE CONCAT2E(tightEncode,BPP)
-#define SWAP_PIXEL CONCAT2E(SWAP,BPP)
+#define TIGHT_ENCODE TightEncoder::CONCAT2E(tightEncode,BPP)
 #define HASH_FUNCTION CONCAT2E(HASH_FUNC,BPP)
-#define PACK_PIXELS CONCAT2E(packPixels,BPP)
-#define ENCODE_SOLID_RECT CONCAT2E(encodeSolidRect,BPP)
-#define ENCODE_FULLCOLOR_RECT CONCAT2E(encodeFullColorRect,BPP)
-#define ENCODE_MONO_RECT CONCAT2E(encodeMonoRect,BPP)
-#define ENCODE_INDEXED_RECT CONCAT2E(encodeIndexedRect,BPP)
-#define ENCODE_JPEG_RECT CONCAT2E(encodeJpegRect,BPP)
-#define FILL_PALETTE CONCAT2E(fillPalette,BPP)
-#define CHECK_SOLID_TILE CONCAT2E(checkSolidTile,BPP)
+#define PACK_PIXELS TightEncoder::CONCAT2E(packPixels,BPP)
+#define ENCODE_SOLID_RECT TightEncoder::CONCAT2E(encodeSolidRect,BPP)
+#define ENCODE_FULLCOLOR_RECT TightEncoder::CONCAT2E(encodeFullColorRect,BPP)
+#define ENCODE_MONO_RECT TightEncoder::CONCAT2E(encodeMonoRect,BPP)
+#define ENCODE_INDEXED_RECT TightEncoder::CONCAT2E(encodeIndexedRect,BPP)
+#define ENCODE_JPEG_RECT TightEncoder::CONCAT2E(encodeJpegRect,BPP)
+#define FAST_FILL_PALETTE TightEncoder::CONCAT2E(fastFillPalette,BPP)
+#define FILL_PALETTE TightEncoder::CONCAT2E(fillPalette,BPP)
+#define CHECK_SOLID_TILE TightEncoder::CONCAT2E(checkSolidTile,BPP)
 
 #ifndef TIGHT_ONCE
 #define TIGHT_ONCE
-
-//
-// C-style structures to store palette entries and compression paramentes.
-// Such code probably should be converted into C++ classes.
-//
-
-struct TIGHT_COLOR_LIST {
-  TIGHT_COLOR_LIST *next;
-  int idx;
-  rdr::U32 rgb;
-};
-
-struct TIGHT_PALETTE_ENTRY {
-  TIGHT_COLOR_LIST *listNode;
-  int numPixels;
-};
-
-struct TIGHT_PALETTE {
-  TIGHT_PALETTE_ENTRY entry[256];
-  TIGHT_COLOR_LIST *hash[256];
-  TIGHT_COLOR_LIST list[256];
-};
-
-// FIXME: Is it really a good idea to use static variables for this?
-static bool s_pack24;             // use 24-bit packing for 32-bit pixels
-
-// FIXME: Make a separate class for palette operations.
-static int s_palMaxColors, s_palNumColors;
-static rdr::U32 s_monoBackground, s_monoForeground;
-static TIGHT_PALETTE s_palette;
-
-//
-// Swapping bytes in pixels.
-// FIXME: Use a sort of ImageGetter that does not convert pixel format?
-//
-
-#ifndef SWAP16
-#define SWAP16(n) ((((n) & 0xff) << 8) | (((n) >> 8) & 0xff))
-#endif
-#ifndef SWAP32
-#define SWAP32(n) (((n) >> 24) | (((n) & 0x00ff0000) >> 8) | \
-                   (((n) & 0x0000ff00) << 8) | ((n) << 24))
-#endif
 
 //
 // Functions to operate on palette structures.
@@ -106,13 +60,13 @@ static TIGHT_PALETTE s_palette;
 #define HASH_FUNC16(rgb) ((int)(((rgb >> 8) + rgb) & 0xFF))
 #define HASH_FUNC32(rgb) ((int)(((rgb >> 16) + (rgb >> 8)) & 0xFF))
 
-static void paletteReset(void)
+void TightEncoder::paletteReset(void)
 {
-  s_palNumColors = 0;
-  memset(s_palette.hash, 0, 256 * sizeof(TIGHT_COLOR_LIST *));
+  palNumColors = 0;
+  memset(palette.hash, 0, 256 * sizeof(TIGHT_COLOR_LIST *));
 }
 
-static int paletteInsert(rdr::U32 rgb, int numPixels, int bpp)
+int TightEncoder::paletteInsert(rdr::U32 rgb, int numPixels, int bpp)
 {
   TIGHT_COLOR_LIST *pnode;
   TIGHT_COLOR_LIST *prev_pnode = NULL;
@@ -120,59 +74,59 @@ static int paletteInsert(rdr::U32 rgb, int numPixels, int bpp)
 
   hash_key = (bpp == 16) ? HASH_FUNC16(rgb) : HASH_FUNC32(rgb);
 
-  pnode = s_palette.hash[hash_key];
+  pnode = palette.hash[hash_key];
 
   while (pnode != NULL) {
     if (pnode->rgb == rgb) {
       // Such palette entry already exists.
       new_idx = idx = pnode->idx;
-      count = s_palette.entry[idx].numPixels + numPixels;
-      if (new_idx && s_palette.entry[new_idx-1].numPixels < count) {
+      count = palette.entry[idx].numPixels + numPixels;
+      if (new_idx && palette.entry[new_idx-1].numPixels < count) {
         do {
-          s_palette.entry[new_idx] = s_palette.entry[new_idx-1];
-          s_palette.entry[new_idx].listNode->idx = new_idx;
+          palette.entry[new_idx] = palette.entry[new_idx-1];
+          palette.entry[new_idx].listNode->idx = new_idx;
           new_idx--;
         }
         while (new_idx &&
-          s_palette.entry[new_idx-1].numPixels < count);
-        s_palette.entry[new_idx].listNode = pnode;
+          palette.entry[new_idx-1].numPixels < count);
+        palette.entry[new_idx].listNode = pnode;
         pnode->idx = new_idx;
       }
-      s_palette.entry[new_idx].numPixels = count;
-      return s_palNumColors;
+      palette.entry[new_idx].numPixels = count;
+      return palNumColors;
     }
     prev_pnode = pnode;
     pnode = pnode->next;
   }
 
   // Check if palette is full.
-  if ( s_palNumColors == 256 || s_palNumColors == s_palMaxColors ) {
-    s_palNumColors = 0;
+  if ( palNumColors == 256 || palNumColors == palMaxColors ) {
+    palNumColors = 0;
     return 0;
   }
 
   // Move palette entries with lesser pixel counts.
-  for ( idx = s_palNumColors;
-  idx > 0 && s_palette.entry[idx-1].numPixels < numPixels;
+  for ( idx = palNumColors;
+  idx > 0 && palette.entry[idx-1].numPixels < numPixels;
   idx-- ) {
-    s_palette.entry[idx] = s_palette.entry[idx-1];
-    s_palette.entry[idx].listNode->idx = idx;
+    palette.entry[idx] = palette.entry[idx-1];
+    palette.entry[idx].listNode->idx = idx;
   }
 
   // Add new palette entry into the freed slot.
-  pnode = &s_palette.list[s_palNumColors];
+  pnode = &palette.list[palNumColors];
   if (prev_pnode != NULL) {
     prev_pnode->next = pnode;
   } else {
-    s_palette.hash[hash_key] = pnode;
+    palette.hash[hash_key] = pnode;
   }
   pnode->next = NULL;
   pnode->idx = idx;
   pnode->rgb = rgb;
-  s_palette.entry[idx].listNode = pnode;
-  s_palette.entry[idx].numPixels = numPixels;
+  palette.entry[idx].listNode = pnode;
+  palette.entry[idx].numPixels = numPixels;
 
-  return (++s_palNumColors);
+  return (++palNumColors);
 }
 
 //
@@ -180,16 +134,16 @@ static int paletteInsert(rdr::U32 rgb, int numPixels, int bpp)
 // size is less than TIGHT_MIN_TO_COMPRESS bytes.
 //
 
-static void compressData(rdr::OutStream *os, rdr::ZlibOutStream *zos,
-                         const void *buf, const PixelFormat& pf,
-                         unsigned int length, int zlibLevel)
+void TightEncoder::compressData(rdr::OutStream *os, rdr::ZlibOutStream *zos,
+                                const void *buf, unsigned int length,
+                                int zlibLevel)
 {
   if (length < TIGHT_MIN_TO_COMPRESS) {
     os->writeBytes(buf, length);
   } else {
     // FIXME: Using a temporary MemOutStream may be not efficient.
     //        Maybe use the same static object used in the JPEG coder?
-    int maxBeforeSize = s_pconf->maxRectSize * (pf.bpp / 8);
+    int maxBeforeSize = pconf->maxRectSize * (clientpf.bpp / 8);
     int maxAfterSize = maxBeforeSize + (maxBeforeSize + 99) / 100 + 12;
     rdr::MemOutStream mem_os(maxAfterSize);
     zos->setUnderlying(&mem_os);
@@ -204,41 +158,25 @@ static void compressData(rdr::OutStream *os, rdr::ZlibOutStream *zos,
 
 #endif  // #ifndef TIGHT_ONCE
 
-static void ENCODE_SOLID_RECT     (rdr::OutStream *os,
-                                   PIXEL_T *buf, const PixelFormat& pf);
-static void ENCODE_FULLCOLOR_RECT (rdr::OutStream *os, rdr::ZlibOutStream zos[4],
-                                   PIXEL_T *buf, const PixelFormat& pf, const Rect& r);
-static void ENCODE_MONO_RECT      (rdr::OutStream *os, rdr::ZlibOutStream zos[4],
-                                   PIXEL_T *buf, const PixelFormat& pf, const Rect& r);
-#if (BPP != 8)
-static void ENCODE_INDEXED_RECT   (rdr::OutStream *os, rdr::ZlibOutStream zos[4],
-                                   PIXEL_T *buf, const PixelFormat& pf, const Rect& r);
-static void ENCODE_JPEG_RECT      (rdr::OutStream *os, JpegCompressor& jc,
-                                   PIXEL_T *buf, const PixelFormat& pf, const Rect& r);
-#endif
-
-static void FILL_PALETTE (PIXEL_T *data, int count);
-
 //
 // Convert 32-bit color samples into 24-bit colors, in place.
 // Performs packing only when redMax, greenMax and blueMax are all 255.
 // Color components are assumed to be byte-aligned.
 //
 
-static inline unsigned int PACK_PIXELS (PIXEL_T *buf, unsigned int count,
-                                        const PixelFormat& pf)
+unsigned int PACK_PIXELS (PIXEL_T *buf, unsigned int count)
 {
 #if (BPP != 32)
   return count * sizeof(PIXEL_T);
 #else
-  if (!s_pack24)
+  if (!pack24)
     return count * sizeof(PIXEL_T);
 
   rdr::U32 pix;
   rdr::U8 *dst = (rdr::U8 *)buf;
   for (unsigned int i = 0; i < count; i++) {
     pix = *buf++;
-    pf.rgbFromBuffer(dst, (rdr::U8*)&pix, 1, NULL);
+    clientpf.rgbFromBuffer(dst, (rdr::U8*)&pix, 1, NULL);
     dst += 3;
   }
   return count * 3;
@@ -249,64 +187,71 @@ static inline unsigned int PACK_PIXELS (PIXEL_T *buf, unsigned int count,
 // Main function of the Tight encoder
 //
 
-void TIGHT_ENCODE (const Rect& r, rdr::OutStream *os,
-                  rdr::ZlibOutStream zos[4], JpegCompressor &jc, void* buf,
-                  const PixelFormat& pf, bool forceSolid)
+void TIGHT_ENCODE (const Rect& r, rdr::OutStream *os, bool forceSolid)
 {
-  char * fbptr = (rfbScreen.pfbMemory
-    + (rfbScreen.paddedWidthInBytes * r.tl.y)
-    + (r.tl.x * (rfbScreen.bitsPerPixel / 8)));
-  (*cl->translateFn)(cl->translateLookupTable, &rfbServerFormat,
-    &cl->format, fbptr, (char *)buf, rfbScreen.paddedWidthInBytes,
-    forceSolid? 1 : r.width(), forceSolid ? 1 : r.height());
-
-  PIXEL_T* pixels = (PIXEL_T*)buf;
+  int stride = r.width();
+  PIXEL_T *pixels = (PIXEL_T *)ig->getPixelsRW(r, &stride);
 
 #if (BPP == 32)
   // Check if it's necessary to pack 24-bit pixels, and
   // compute appropriate shift values if necessary.
-  s_pack24 = pf.is888();
+  pack24 = clientpf.is888();
 #endif
 
   if (forceSolid)
-    s_palNumColors = 1;
+    palNumColors = 1;
   else {
-    s_palMaxColors = r.area() / s_pconf->idxMaxColorsDivisor;
-    if (s_pjconf != NULL) s_palMaxColors = s_pconf->palMaxColorsWithJPEG;
-    if (s_palMaxColors < 2 && r.area() >= s_pconf->monoMinRectSize) {
-      s_palMaxColors = 2;
+    palMaxColors = r.area() / pconf->idxMaxColorsDivisor;
+    if (pjconf != NULL) palMaxColors = pconf->palMaxColorsWithJPEG;
+    if (palMaxColors < 2 && r.area() >= pconf->monoMinRectSize) {
+      palMaxColors = 2;
     }
 
-    FILL_PALETTE(pixels, r.area());
+    if (clientpf.equal(serverpf) && clientpf.bpp >= 16) {
+      // This is so we can avoid translating the pixels when compressing
+      // with JPEG, since it is unnecessary
+      FAST_FILL_PALETTE(r, pixels, stride);
+      if(palNumColors != 0 || pjconf == NULL) {
+        pixels = (PIXEL_T *)getImageBuf(r.area(), clientpf);
+        stride = r.width();
+        ig->getImage(pixels, r);
+      }
+    }
+    else {
+      pixels = (PIXEL_T *)getImageBuf(r.area(), clientpf);
+      stride = r.width();
+      ig->getImage(pixels, r);
+      FILL_PALETTE(pixels, r.area());
+    }
   }
 
-  switch (s_palNumColors) {
+  switch (palNumColors) {
   case 0:
     // Truecolor image
 #if (BPP != 8)
-    if (s_pjconf != NULL) {
-      ENCODE_JPEG_RECT(os, jc, pixels, pf, r);
+    if (pjconf != NULL) {
+      ENCODE_JPEG_RECT(os, pixels, stride, r);
       jpegrect++;  jpegpixels+=r.area();
       break;
     }
 #endif
-    ENCODE_FULLCOLOR_RECT(os, zos, pixels, pf, r);
+    ENCODE_FULLCOLOR_RECT(os, pixels, r);
     fcrect++;  fcpixels+=r.area();
     break;
   case 1:
     // Solid rectangle
-    ENCODE_SOLID_RECT(os, pixels, pf);
+    ENCODE_SOLID_RECT(os, pixels);
     solidrect++;  solidpixels+=r.area();
     break;
   case 2:
     // Two-color rectangle
-    ENCODE_MONO_RECT(os, zos, pixels, pf, r);
+    ENCODE_MONO_RECT(os, pixels, r);
     monorect++;  monopixels+=r.area();
     break;
 #if (BPP != 8)
   default:
     // Up to 256 different colors
-    ENCODE_INDEXED_RECT(os, zos, pixels, pf, r);
+    ENCODE_INDEXED_RECT(os, pixels, r);
     ndxrect++;  ndxpixels+=r.area();
 #endif
   }
@@ -316,36 +261,34 @@ void TIGHT_ENCODE (const Rect& r, rdr::OutStream *os,
 // Subencoding implementations.
 //
 
-static void ENCODE_SOLID_RECT (rdr::OutStream *os, PIXEL_T *buf, const PixelFormat& pf)
+void ENCODE_SOLID_RECT (rdr::OutStream *os, PIXEL_T *buf)
 {
   os->writeU8(0x08 << 4);
 
-  int length = PACK_PIXELS(buf, 1, pf);
+  int length = PACK_PIXELS(buf, 1);
   os->writeBytes(buf, length);
 }
 
-static void ENCODE_FULLCOLOR_RECT (rdr::OutStream *os, rdr::ZlibOutStream zos[4],
-                                   PIXEL_T *buf, const PixelFormat& pf, const Rect& r)
+void ENCODE_FULLCOLOR_RECT (rdr::OutStream *os, PIXEL_T *buf, const Rect& r)
 {
   const int streamId = 0;
   os->writeU8(streamId << 4);
 
-  int length = PACK_PIXELS(buf, r.area(), pf);
+  int length = PACK_PIXELS(buf, r.area());
   cl->zsActive[streamId] = TRUE;
-  compressData(os, &zos[streamId], buf, pf, length, s_pconf->rawZlibLevel);
+  compressData(os, &zos[streamId], buf, length, pconf->rawZlibLevel);
 }
 
-static void ENCODE_MONO_RECT (rdr::OutStream *os, rdr::ZlibOutStream zos[4],
-                              PIXEL_T *buf, const PixelFormat& pf, const Rect& r)
+void ENCODE_MONO_RECT (rdr::OutStream *os, PIXEL_T *buf, const Rect& r)
 {
   const int streamId = 1;
   os->writeU8((streamId | 0x04) << 4);
   os->writeU8(0x01);
 
   // Write the palette
-  PIXEL_T pal[2] = { (PIXEL_T)s_monoBackground, (PIXEL_T)s_monoForeground };
+  PIXEL_T pal[2] = { (PIXEL_T)monoBackground, (PIXEL_T)monoForeground };
   os->writeU8(1);
-  os->writeBytes(pal, PACK_PIXELS(pal, 2, pf));
+  os->writeBytes(pal, PACK_PIXELS(pal, 2));
 
   // Encode the data in-place
   PIXEL_T *src = buf;
@@ -357,7 +300,7 @@ static void ENCODE_MONO_RECT (rdr::OutStream *os, rdr::ZlibOutStream zos[4],
   int aligned_width;
   int x, y, bg_bits;
 
-  bg = (PIXEL_T) s_monoBackground;
+  bg = (PIXEL_T) monoBackground;
   aligned_width = w - w % 8;
 
   for (y = 0; y < h; y++) {
@@ -399,12 +342,11 @@ static void ENCODE_MONO_RECT (rdr::OutStream *os, rdr::ZlibOutStream zos[4],
   int length = (w + 7) / 8;
   length *= h;
   cl->zsActive[streamId] = TRUE;
-  compressData(os, &zos[streamId], buf, pf, length, s_pconf->monoZlibLevel);
+  compressData(os, &zos[streamId], buf, length, pconf->monoZlibLevel);
 }
 
 #if (BPP != 8)
-static void ENCODE_INDEXED_RECT (rdr::OutStream *os, rdr::ZlibOutStream zos[4],
-                                 PIXEL_T *buf, const PixelFormat& pf, const Rect& r)
+void ENCODE_INDEXED_RECT (rdr::OutStream *os, PIXEL_T *buf, const Rect& r)
 {
   const int streamId = 2;
   os->writeU8((streamId | 0x04) << 4);
@@ -413,10 +355,10 @@ static void ENCODE_INDEXED_RECT (rdr::OutStream *os, rdr::ZlibOutStream zos[4],
   // Write the palette
   {
     PIXEL_T pal[256];
-    for (int i = 0; i < s_palNumColors; i++)
-      pal[i] = (PIXEL_T)s_palette.entry[i].listNode->rgb;
-    os->writeU8((rdr::U8)(s_palNumColors - 1));
-    os->writeBytes(pal, PACK_PIXELS(pal, s_palNumColors, pf));
+    for (int i = 0; i < palNumColors; i++)
+      pal[i] = (PIXEL_T)palette.entry[i].listNode->rgb;
+    os->writeU8((rdr::U8)(palNumColors - 1));
+    os->writeBytes(pal, PACK_PIXELS(pal, palNumColors));
   }
 
   // Encode data in-place
@@ -432,7 +374,7 @@ static void ENCODE_INDEXED_RECT (rdr::OutStream *os, rdr::ZlibOutStream zos[4],
     while (count && *src == rgb) {
       rep++, src++, count--;
     }
-    pnode = s_palette.hash[HASH_FUNCTION(rgb)];
+    pnode = palette.hash[HASH_FUNCTION(rgb)];
     while (pnode != NULL) {
       if ((PIXEL_T)pnode->rgb == rgb) {
         *dst++ = (rdr::U8)pnode->idx;
@@ -448,7 +390,7 @@ static void ENCODE_INDEXED_RECT (rdr::OutStream *os, rdr::ZlibOutStream zos[4],
 
   // Write the data
   cl->zsActive[streamId] = TRUE;
-  compressData(os, &zos[streamId], buf, pf, r.area(), s_pconf->idxZlibLevel);
+  compressData(os, &zos[streamId], buf, r.area(), pconf->idxZlibLevel);
 }
 #endif  // #if (BPP != 8)
 
@@ -457,13 +399,12 @@ static void ENCODE_INDEXED_RECT (rdr::OutStream *os, rdr::ZlibOutStream zos[4],
 //
 
 #if (BPP != 8)
-static void ENCODE_JPEG_RECT (rdr::OutStream *os, JpegCompressor& jc,
-                              PIXEL_T *buf, const PixelFormat& pf,
-                              const Rect& r)
+void ENCODE_JPEG_RECT (rdr::OutStream *os, PIXEL_T *buf, int stride,
+                       const Rect& r)
 {
   jc.clear();
-  jc.compress((rdr::U8 *)buf, r, pf, s_pjconf->jpegQuality,
-    s_pjconf->jpegSubSample);
+  jc.compress((rdr::U8 *)buf, stride * serverpf.bpp / 8, r, serverpf,
+    pjconf->jpegQuality, pjconf->jpegSubSample);
   os->writeU8(0x09 << 4);
   os->writeCompactLength(jc.length());
   os->writeBytes(jc.data(), jc.length());
@@ -475,21 +416,22 @@ static void ENCODE_JPEG_RECT (rdr::OutStream *os, JpegCompressor& jc,
 //
 
 #if (BPP == 8)
-static void FILL_PALETTE (PIXEL_T *data, int count)
+
+void FILL_PALETTE (PIXEL_T *data, int count)
 {
   PIXEL_T c0, c1;
   int i, n0, n1;
 
-  s_palNumColors = 0;
+  palNumColors = 0;
 
   c0 = data[0];
   for (i = 1; i < count && data[i] == c0; i++);
   if (i == count) {
-    s_palNumColors = 1;
+    palNumColors = 1;
     return;                       // Solid rectangle
   }
 
-  if (s_palMaxColors < 2)
+  if (palMaxColors < 2)
     return;
 
   n0 = i;
@@ -505,17 +447,23 @@ static void FILL_PALETTE (PIXEL_T *data, int count)
   }
   if (i == count) {
     if (n0 > n1) {
-      s_monoBackground = (rdr::U32)c0;
-      s_monoForeground = (rdr::U32)c1;
+      monoBackground = (rdr::U32)c0;
+      monoForeground = (rdr::U32)c1;
     } else {
-      s_monoBackground = (rdr::U32)c1;
-      s_monoForeground = (rdr::U32)c0;
+      monoBackground = (rdr::U32)c1;
+      monoForeground = (rdr::U32)c0;
     }
-    s_palNumColors = 2;           // Two colors
+    palNumColors = 2;           // Two colors
   }
 }
+
+void FAST_FILL_PALETTE (const Rect& r, PIXEL_T *data, int stride)
+{
+}
+
 #else   // (BPP != 8)
-static void FILL_PALETTE (PIXEL_T *data, int count)
+
+void FILL_PALETTE (PIXEL_T *data, int count)
 {
   PIXEL_T c0, c1, ci = 0;
   int i, n0, n1, ni;
@@ -523,12 +471,12 @@ static void FILL_PALETTE (PIXEL_T *data, int count)
   c0 = data[0];
   for (i = 1; i < count && data[i] == c0; i++);
   if (i >= count) {
-    s_palNumColors = 1;           // Solid rectangle
+    palNumColors = 1;           // Solid rectangle
     return;
   }
 
-  if (s_palMaxColors < 2) {
-    s_palNumColors = 0;           // Full-color format preferred
+  if (palMaxColors < 2) {
+    palNumColors = 0;           // Full-color format preferred
     return;
   }
 
@@ -546,13 +494,13 @@ static void FILL_PALETTE (PIXEL_T *data, int count)
   }
   if (i >= count) {
     if (n0 > n1) {
-      s_monoBackground = (rdr::U32)c0;
-      s_monoForeground = (rdr::U32)c1;
+      monoBackground = (rdr::U32)c0;
+      monoForeground = (rdr::U32)c1;
     } else {
-      s_monoBackground = (rdr::U32)c1;
-      s_monoForeground = (rdr::U32)c0;
+      monoBackground = (rdr::U32)c1;
+      monoForeground = (rdr::U32)c0;
     }
-    s_palNumColors = 2;           // Two colors
+    palNumColors = 2;           // Two colors
     return;
   }
 
@@ -573,38 +521,124 @@ static void FILL_PALETTE (PIXEL_T *data, int count)
   }
   paletteInsert (ci, (rdr::U32)ni, BPP);
 }
-#endif  // #if (BPP == 8)
 
-bool CHECK_SOLID_TILE(Rect& r, CARD32 *colorPtr, bool needSameColor)
+void FAST_FILL_PALETTE (const Rect& r, PIXEL_T *data, int stride)
 {
-  PIXEL_T *fbptr;
-  PIXEL_T colorValue;
-  int dx, dy;
+  PIXEL_T c0, c1, ci = 0, mask, c0t, c1t, cit;
+  int i, j, i2, j2, n0, n1, ni;
+  int w = r.width(), h = r.height();
 
-  fbptr = (PIXEL_T *)
-    &rfbScreen.pfbMemory[r.tl.y * rfbScreen.paddedWidthInBytes
-      + r.tl.x * (BPP/8)];
+  if (ig->willTransform()) {
+    mask = serverpf.redMax << serverpf.redShift;
+    mask |= serverpf.greenMax << serverpf.greenShift;
+    mask |= serverpf.blueMax << serverpf.blueShift;
+  }
+  else mask = ~0;
 
-  colorValue = *fbptr;
-  if (needSameColor && (CARD32)colorValue != *colorPtr)
-    return false;
-
-  for (dy = 0; dy < r.height(); dy++) {
-    for (dx = 0; dx < r.width(); dx++) {
-      if (colorValue != fbptr[dx])
-        return false;
+  c0 = data[0] & mask;
+  for (j = 0; j < h; j++) {
+    for (i = 0; i < w; i++) {
+      if ((data[j * stride + i] & mask) != c0)
+        goto soliddone;
     }
-    fbptr = (PIXEL_T *)((CARD8 *)fbptr + rfbScreen.paddedWidthInBytes);
   }
 
-  *colorPtr = (CARD32)colorValue;
+  soliddone:
+  if (j >= h) {
+    palNumColors = 1;           // Solid rectangle
+    return;
+  }
+  if (palMaxColors < 2) {
+    palNumColors = 0;           // Full-color format preferred
+    return;
+  }
+
+  n0 = j * w + i;
+  c1 = data[j * stride + i] & mask;
+  n1 = 0;
+  i++;  if (i >= w) {i = 0;  j++;}
+  for (j2 = j; j2 < h; j2++) {
+    for (i2 = i; i2 < w; i2++) {
+      ci = data[j2 * stride + i2] & mask;
+      if (ci == c0) {
+        n0++;
+      } else if (ci == c1) {
+        n1++;
+      } else
+        goto monodone;
+    }
+    i = 0;
+  }
+
+  monodone:
+  ig->translateRect(&c0, 1, Rect(0, 0, 1, 1), &c0t, 1, Point(0, 0));
+  ig->translateRect(&c1, 1, Rect(0, 0, 1, 1), &c1t, 1, Point(0, 0));
+
+  if (j2 >= h) {
+    if (n0 > n1) {
+      monoBackground = (rdr::U32)c0t;
+      monoForeground = (rdr::U32)c1t;
+    } else {
+      monoBackground = (rdr::U32)c1t;
+      monoForeground = (rdr::U32)c0t;
+    }
+    palNumColors = 2;           // Two colors
+    return;
+  }
+
+  paletteReset();
+  paletteInsert (c0t, (rdr::U32)n0, BPP);
+  paletteInsert (c1t, (rdr::U32)n1, BPP);
+
+  ni = 1;
+  i2++;  if (i2 >= w) {i2 = 0;  j2++;}
+  for (j = j2; j < h; j++) {
+    for (i = i2; i < w; i++) {
+      if ((data[j * stride + i] & mask) == ci) {
+        ni++;
+      } else {
+        ig->translateRect(&ci, 1, Rect(0, 0, 1, 1), &cit, 1, Point(0, 0));
+        if (!paletteInsert (cit, (rdr::U32)ni, BPP))
+          return;
+        ci = data[j * stride + i] & mask;
+        ni = 1;
+      }
+    }
+    i2 = 0;
+  }
+  ig->translateRect(&ci, 1, Rect(0, 0, 1, 1), &cit, 1, Point(0, 0));
+  paletteInsert (cit, (rdr::U32)ni, BPP);
+}
+
+#endif  // #if (BPP == 8)
+
+bool CHECK_SOLID_TILE(Rect& r, rdr::U32 *colorPtr, bool needSameColor)
+{
+  PIXEL_T *buf, colorValue;
+  int dx, dy;
+  int w = r.width(), h = r.height();
+
+  int stride = w;
+  buf = (PIXEL_T *)ig->getPixelsRW(r, &stride);
+
+  colorValue = *buf;
+  if (needSameColor && (rdr::U32)colorValue != *colorPtr)
+    return false;
+
+  for (dy = 0; dy < h; dy++) {
+    for (dx = 0; dx < w; dx++) {
+      if (colorValue != buf[dx])
+        return false;
+    }
+    buf += stride;
+  }
+
+  *colorPtr = (rdr::U32)colorValue;
   return true;
 }
 
 #undef PIXEL_T
-#undef WRITE_PIXEL
 #undef TIGHT_ENCODE
-#undef SWAP_PIXEL
 #undef HASH_FUNCTION
 #undef PACK_PIXELS
 #undef ENCODE_SOLID_RECT
@@ -612,6 +646,7 @@ bool CHECK_SOLID_TILE(Rect& r, CARD32 *colorPtr, bool needSameColor)
 #undef ENCODE_MONO_RECT
 #undef ENCODE_INDEXED_RECT
 #undef ENCODE_JPEG_RECT
+#undef FAST_FILL_PALETTE
 #undef FILL_PALETTE
 #undef CHECK_SOLID_TILE
 }
