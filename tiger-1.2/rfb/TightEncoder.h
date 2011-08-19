@@ -39,7 +39,7 @@ namespace rfb {
     int idxMaxColorsDivisor;
     int palMaxColorsWithJPEG;
     int jpegQuality;
-    JPEG_SUBSAMP jpegSubSample;
+    JPEG_SUBSAMP jpegSubsampling;
   };
 
   //
@@ -80,6 +80,7 @@ namespace rfb {
     TightEncoder();
     virtual void setCompressLevel(int level);
     virtual void setQualityLevel(int level);
+    virtual void setFineQualityLevel(int quality, JPEG_SUBSAMP subsampling);
     virtual bool writeRect(const Rect& r, TransImageGetter* ig, Rect* actual);
     virtual ~TightEncoder();
 
@@ -149,7 +150,8 @@ namespace rfb {
     static const TIGHT_CONF conf[];
 
     const TIGHT_CONF* pconf;
-    const TIGHT_CONF* pjconf;
+    int jpegQuality;
+    JPEG_SUBSAMP jpegSubsampling;
   };
 
 }

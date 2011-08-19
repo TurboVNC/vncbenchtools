@@ -67,6 +67,11 @@ namespace rfb {
         inRect.height());
     }
 
+    inline void translatePixels(void* inPtr, void* outPtr, int nPixels) {
+      (*cl->translateFn)(cl->translateLookupTable, &rfbServerFormat,
+        &cl->format, (char *)inPtr, (char *)outPtr, nPixels, nPixels, 1);
+    }
+
     bool willTransform(void) {
       return cl->translateFn != rfbTranslateNone;
     }
