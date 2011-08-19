@@ -558,7 +558,7 @@ FilterCopyBPP (threadparam *t, int srcx, int srcy, int rectWidth, int numRows)
 #endif
 
   for (y = 0; y < numRows; y++)
-    memcpy (&dst[y*dstw], &t->uncompressedData[y*rectWidth],
+    memcpy (&dst[y * dstw], &t->uncompressedData[y * rectWidth * (BPP / 8)],
       rectWidth * (BPP / 8));
 
   return True;
