@@ -139,6 +139,10 @@ extern rfbScreenInfo rfbScreen;
  * means 8K minimum.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define UPDATE_BUF_SIZE 30000
 extern char updateBuf[UPDATE_BUF_SIZE];
 extern int ublen;
@@ -208,3 +212,7 @@ extern int rfbLog (char *fmt, ...);
 extern Bool rfbSendRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
 
 extern Bool ReadFromRFBServer(char *out, unsigned int n);
+
+#ifdef __cplusplus
+}
+#endif

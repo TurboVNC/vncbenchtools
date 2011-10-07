@@ -1,6 +1,6 @@
 /*  RawUpdates2ppm -- an utility to convert ``raw'' files saved with
  *    the fbs-dump utility to separate 24-bit ppm files.
- *  $Id: compare-encodings.c,v 1.8 2010-08-17 06:11:39 dcommander Exp $
+ *  $Id: compare-encodings.c,v 1.9 2011-10-07 09:15:45 dcommander Exp $
  *  Copyright (C) 2000 Const Kaplinsky <const@ce.cctpu.edu.ru>
  *  Copyright (C) 2008 Sun Microsystems, Inc.
  *  Copyright (C) 2010 D. R. Commander
@@ -34,6 +34,7 @@
 #include <string.h>
 #include <limits.h>
 #include <errno.h>
+#include <sys/time.h>
 
 #include "rfb.h"
 
@@ -89,7 +90,9 @@ static int rectWidth, rectColors;
 static char tightPalette[256*4];
 static CARD8 tightPrevRow[2048*3*sizeof(CARD16)];
 
+#ifndef TIGERD
 /* JPEG decoder state. */
+
 static Bool jpegError;
 
 #include <jpeglib.h>
@@ -158,6 +161,8 @@ JpegSetSrcManager(j_decompress_ptr cinfo, CARD8 *compressedData,
   cinfo->src = &jpegSrcManager;
 }
 
+#endif
+
 static long
 ReadCompactLen (void)
 {
@@ -184,17 +189,29 @@ ReadCompactLen (void)
 #define BPP 8
 #include "hextiled.c"
 #include "zlibd.c"
+#ifdef TIGERD
+#include "tigerd.cxx"
+#else
 #include "tightd.c"
+#endif
 #undef BPP
 #define BPP 16
 #include "hextiled.c"
 #include "zlibd.c"
+#ifdef TIGERD
+#include "tigerd.cxx"
+#else
 #include "tightd.c"
+#endif
 #undef BPP
 #define BPP 32
 #include "hextiled.c"
 #include "zlibd.c"
+#ifdef TIGERD
+#include "tigerd.cxx"
+#else
 #include "tightd.c"
+#endif
 #undef BPP
 
 #define TIGHT_STATISTICS
@@ -770,7 +787,7 @@ static int handle_raw##bpp (FILE *in, int x, int y, int width, int height) \
 {                                                                          \
   char *data = NULL;                                                       \
                                                                            \
-  if ((data = malloc(width * height * (bpp / 8))) == NULL) {               \
+  if ((data = (char *)malloc(width * height * (bpp / 8))) == NULL) {       \
     fprintf (stderr, "Memory allocation error.\n");                        \
     return -1;                                                             \
   }                                                                        \

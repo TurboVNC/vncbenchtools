@@ -33,7 +33,7 @@ unsigned long solidrect=0, solidpixels=0, monorect=0, monopixels=0, ndxrect=0,
   ndxpixels=0, jpegrect=0, jpegpixels=0, fcrect=0, fcpixels=0, gradrect=0,
   gradpixels=0;
 
-rdr::U8* getImageBuf(int required, const PixelFormat& pf)
+static rdr::U8* getImageBuf(int required, const PixelFormat& pf)
 {
   int requiredBytes = required * (pf.bpp / 8);
   int size = requiredBytes;

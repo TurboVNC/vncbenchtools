@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.6 2011-08-03 00:37:18 dcommander Exp $
+# $Id: Makefile,v 1.7 2011-10-07 09:15:45 dcommander Exp $
 
 INSTDIR = /usr/local/bin
 
@@ -16,9 +16,16 @@ ifeq ($(TIGERVNC), yes)
 	SRCS := $(SRCS) tiger.cxx
 	CFLAGS := $(CFLAGS) -I/opt/libjpeg-turbo/include
 	LDFLAGS := $(LDFLAGS) -L/opt/libjpeg-turbo/lib32 -Wl,-R/opt/libjpeg-turbo/lib32
+	ifeq ($(TIGERD), yes)
+		CFLAGS := $(CFLAGS) -DTIGER_BOTH
+	endif
 else
 	OBJS := $(OBJS) tight.o
 	SRCS := $(SRCS) tight.c
+endif
+
+ifeq ($(TIGERD), yes)
+  CFLAGS := $(CFLAGS) -DTIGERD
 endif
 
 default: $(PROG)
@@ -27,11 +34,20 @@ install: $(PROG)
 	install -p -g root -o root $(PROG) $(INSTDIR)
 
 ifeq ($(TIGERVNC), yes)
+
+$(PROG): $(OBJS)
+	$(CXX) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $(PROG)
+
+else
+
+ifeq ($(TIGERD), yes)
 $(PROG): $(OBJS)
 	$(CXX) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $(PROG)
 else
 $(PROG): $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $(PROG)
+endif
+
 endif
 
 clean:
@@ -43,12 +59,17 @@ depend: $(SRCS)
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
+ifeq ($(TIGERD), yes)
+compare-encodings.o: compare-encodings.c
+	$(CXX) $(CFLAGS) -c $< -o $@
+endif
+
 %.o: %.cxx
 	$(CXX) $(CFLAGS) -c $< -o $@
 
 # DO NOT DELETE
 
-compare-encodings.o: rfb.h rfbproto.h hextiled.c zlibd.c tightd.c
+compare-encodings.o: rfb.h rfbproto.h hextiled.c zlibd.c tightd.c tigerd.cxx
 misc.o: rfb.h rfbproto.h
 hextile.o: rfb.h rfbproto.h
 zlib.o: rfb.h rfbproto.h
