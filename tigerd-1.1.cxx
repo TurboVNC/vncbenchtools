@@ -17,8 +17,7 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
  * USA.
  */
-//#include <rfb/CMsgReader.h>
-//#include <rfb/CMsgHandler.h>
+
 #include "tiger-1.1/rfb/TightDecoder.h"
 #include <stdio.h> /* jpeglib.h needs FILE */
 extern "C" {
