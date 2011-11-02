@@ -183,10 +183,9 @@ static Bool HandleTightBPP(int rx, int ry, int rw, int rh)
     /* Uncompressed RGB24 JPEG data, before translated, can be up to 3
        times larger, if VNC bpp is 8. */
     rdr::U8* buf = getImageBuf(r.area()*3, pf);
-    MemInStream is(sendBuf, SEND_BUF_SIZE);
-    is.reposition(sbptr);
-    TIGHT_DECODE (r, &is, td->zis, (PIXEL_T *) buf, pf);
-    sbptr = is.pos();
+    is->reposition(sbptr);
+    TIGHT_DECODE (r, is, td->zis, (PIXEL_T *) buf, pf);
+    sbptr = is->pos();
   }
   catch(Exception e) {
     fprintf(stderr, "ERROR: %s\n", e.str());
