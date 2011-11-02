@@ -231,6 +231,8 @@ DECOMPRESS_JPEG_RECT(const Rect& r, rdr::InStream* is,
   is->readBytes(netbuf, compressedLen);
 
   jd.decompress(netbuf, compressedLen, (rdr::U8 *)buf, r, pf);
+
+  delete [] netbuf;
 }
 
 #if BPP == 32
