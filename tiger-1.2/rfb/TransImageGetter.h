@@ -36,13 +36,13 @@ namespace rfb {
 
     void getImage(void* outPtr, const Rect& r, int outStride=0) {
       int inStride;
-      const rdr::U8* inPtr = getPixelsRW(r, &inStride);
+      const rdr::U8* inPtr = getRawPixelsRW(r, &inStride);
       if (!outStride) outStride = r.width();
       translateRect((void*)inPtr, inStride, Rect(0, 0, r.width(), r.height()),
                     outPtr, outStride, Point(0, 0));
     }
 
-    rdr::U8 *getPixelsRW(const Rect &r, int *stride) {
+    rdr::U8 *getRawPixelsRW(const Rect &r, int *stride) {
       *stride = rfbScreen.paddedWidthInBytes / (rfbScreen.bitsPerPixel/8);
       return (rdr::U8 *)(rfbScreen.pfbMemory
         + (rfbScreen.paddedWidthInBytes * r.tl.y)
