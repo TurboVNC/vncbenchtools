@@ -4,8 +4,8 @@ INSTDIR = /usr/local/bin
 
 CC = gcc
 CXX = g++
-CFLAGS = -O3 -m32 -Wall -I. -D_GNU_SOURCE
-LDFLAGS = -lz -O3 -m32 -Wall -ljpeg -lturbojpeg -lpthread
+CFLAGS = -O3 -m32 -Wall -fno-strict-aliasing -I. -D_GNU_SOURCE
+LDFLAGS = -lz -O3 -m32 -ljpeg -lturbojpeg -lpthread
 
 PROG = compare-encodings
 OBJS = compare-encodings.o misc.o hextile.o zlib.o translate.o
