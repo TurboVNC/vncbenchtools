@@ -24,6 +24,8 @@
 #include <stdarg.h>
 #include "rfb.h"
 
+extern Bool rfbSetTranslateFunction(rfbClientPtr cl);
+
 char updateBuf[UPDATE_BUF_SIZE], *sendBuf=NULL;
 int ublen, sblen=0, sbptr=0;
 
@@ -170,5 +172,6 @@ rfbSendRectEncodingRaw(cl, x, y, w, h)
 {
   rfbClient.rfbBytesSent[rfbEncodingZlib] +=
     12 + w * h * (cl->format.bitsPerPixel / 8);
+  return True;
 }
 
