@@ -312,7 +312,6 @@ static void *
 TightThreadFunc(param)
     void *param;
 {
-    long status;
     threadparam *t=(threadparam *)param;
     while (!t->deadyet) {
         pthread_mutex_lock(&t->ready);
@@ -351,7 +350,7 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
     int x, y, w, h;
 {
     Bool status = TRUE;
-    int i, j, nt;
+    int i, nt;
 
     if (!threadInit) {
       InitThreads();
@@ -878,7 +877,6 @@ SendTightHeader(t, x, y, w, h)
     int x, y, w, h;
 {
     rfbFramebufferUpdateRectHeader rect;
-    rfbClientPtr cl = t->cl;
 
     if (!CheckUpdateBuf(t, sz_rfbFramebufferUpdateRectHeader))
         return FALSE;
@@ -1118,9 +1116,8 @@ CompressData(t, streamId, dataLen, zlibLevel, zlibStrategy)
     int streamId, dataLen, zlibLevel, zlibStrategy;
 {
     z_streamp pz;
-    int err, i;
+    int err;
     rfbClientPtr cl = t->cl;
-    Bool status;
 
     if (dataLen < TIGHT_MIN_TO_COMPRESS) {
         memcpy(&t->updateBuf[*t->ublen], t->tightBeforeBuf, dataLen);
@@ -1184,7 +1181,6 @@ static Bool SendCompressedData(t, buf, compressedLen)
     int compressedLen;
 {
     int i, portionLen;
-    rfbClientPtr cl = t->cl;
 
     t->updateBuf[(*t->ublen)++] = compressedLen & 0x7F;
     t->bytessent++;
@@ -1662,14 +1658,12 @@ SendJpegRect(t, x, y, w, h, quality)
     int x, y, w, h;
     int quality;
 {
-    int dy;
     unsigned char *srcbuf;
     int ps=rfbServerFormat.bitsPerPixel/8;
     int subsamp=subsampLevel2tjsubsamp[subsampLevel];
     unsigned long size=0;
     int flags=0, pitch;
     unsigned char *tmpbuf=NULL;
-    rfbClientPtr cl = t->cl;
     unsigned long jpegDstDataLen;
 
     if (rfbServerFormat.bitsPerPixel == 8)
