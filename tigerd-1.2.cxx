@@ -18,6 +18,7 @@
  * USA.
  */
 
+#include "tiger-1.2/rfb/CMsgHandler.h"
 #include "tiger-1.2/rfb/TightDecoder.h"
 
 using namespace rfb;
@@ -37,9 +38,26 @@ using namespace rfb;
 
 #define TIGHT_MAX_WIDTH 2048
 
-static FullFramePixelBuffer *pb = NULL;
+#define FILL_RECT(r, p) handler->fillRect(r, p)
+#define IMAGE_RECT(r, p) handler->imageRect(r, p)
 
 #include "tiger-1.2/rfb/JpegDecompressor.cxx"	
+
+static rdr::U8* imageBuf = NULL;
+static int imageBufSize = 0;
+
+static rdr::U8* getImageBuf(int required, const PixelFormat& pf)
+{
+  int requiredBytes = required * (pf.bpp / 8);
+  int size = requiredBytes;
+
+  if (imageBufSize < size) {
+    imageBufSize = size;
+    delete [] imageBuf;
+    imageBuf = new rdr::U8[imageBufSize];
+  }
+  return imageBuf;
+}
 
 #endif
 
@@ -55,22 +73,84 @@ TightDecoder::~TightDecoder()
 {
 }
 
-static MemInStream *is = NULL;
+static MemInStream *mis = NULL;
 
-void TightDecoder::readRect(const Rect& r, const PixelFormat &pf)
+class FrameBuffer : public CMsgHandler
 {
-  this->pf = pf;
-  switch (pf.bpp) {
+  public:
+
+    FrameBuffer(int w, int h, rdr::U8 *data)
+    {
+      PixelFormat cpf(myFormat.bitsPerPixel, myFormat.depth,
+        myFormat.bigEndian==1, myFormat.trueColour==1, myFormat.redMax,
+        myFormat.greenMax, myFormat.blueMax, myFormat.redShift,
+        myFormat.greenShift, myFormat.blueShift);
+      pf = cpf;
+      pb = new FullFramePixelBuffer(pf, w, h, data, NULL);
+    }
+
+    ~FrameBuffer()
+    {
+      delete pb;
+    }
+
+    void fillRect(const Rect& r, Pixel pix)
+    {
+      pb->fillRect(r, pix);
+    }
+
+    void imageRect(const Rect& r, void* pixels)
+    {
+      pb->imageRect(r, pixels);
+    }
+
+    rdr::U8* getRawPixelsRW(const Rect& r, int* stride)
+    {
+      return pb->getPixelsRW(r, stride);
+    }
+
+    void releaseRawPixels(const Rect& r) {}
+
+    const PixelFormat &getPreferredPF(void) { return pf; }
+
+  private:
+
+    FullFramePixelBuffer *pb;
+    PixelFormat pf;
+};
+
+void TightDecoder::readRect(const Rect& r, CMsgHandler* handler)
+{
+  is = mis;
+  this->handler = handler;
+  clientpf = handler->getPreferredPF();
+  PixelFormat spf(rfbServerFormat.bitsPerPixel, rfbServerFormat.depth,
+    rfbServerFormat.bigEndian==1, rfbServerFormat.trueColour==1,
+    rfbServerFormat.redMax, rfbServerFormat.greenMax,
+    rfbServerFormat.blueMax, rfbServerFormat.redShift,
+    rfbServerFormat.greenShift, rfbServerFormat.blueShift);
+  serverpf = spf;
+
+  if (clientpf.equal(serverpf)) {
+    /* Decode directly into the framebuffer (fast path) */
+    directDecode = true;
+  } else {
+    /* Decode into an intermediate buffer and use pixel translation */
+    directDecode = false;
+  }
+
+  switch (serverpf.bpp) {
   case 8:
-    tightDecode8 (is, r); break;
+    tightDecode8 (r); break;
   case 16:
-    tightDecode16(is, r); break;
+    tightDecode16(r); break;
   case 32:
-    tightDecode32(is, r); break;
+    tightDecode32(r); break;
   }
 }
 
 static TightDecoder *td = NULL;
+static FrameBuffer *fb = NULL;
 extern XImage *image;
 
 #endif
@@ -81,11 +161,6 @@ static Bool HandleTightBPP(int rx, int ry, int rw, int rh)
 {
   try {
 
-    PixelFormat pf(myFormat.bitsPerPixel, myFormat.depth,
-      myFormat.bigEndian==1, myFormat.trueColour==1, myFormat.redMax,
-      myFormat.greenMax, myFormat.blueMax, myFormat.redShift,
-      myFormat.greenShift, myFormat.blueShift);
-
     Rect r(rx, ry, rx + rw, ry + rh);
     int i;
     for (i = 0; i < 4; i++) {
@@ -93,19 +168,19 @@ static Bool HandleTightBPP(int rx, int ry, int rw, int rh)
     }
     if (i == 4) {
       if (td) { delete td;  td = NULL; }
-      if (pb) { delete pb;  pb = NULL; }
-      if (is) { delete is;  is = NULL; }
+      if (fb) { delete fb;  fb = NULL; }
+      if (mis) { delete mis; mis = NULL; }
     }
     if (!td) td = new TightDecoder;
-    if (!pb) pb = new FullFramePixelBuffer(pf, image->width, image->height,
-      (rdr::U8 *)image->data, NULL);
-    if (!is) {
-      is = new MemInStream(sendBuf, SEND_BUF_SIZE);
+    if (!fb) fb = new FrameBuffer(image->width, image->height,
+      (rdr::U8 *)image->data);
+    if (!mis) {
+      mis = new MemInStream(sendBuf, SEND_BUF_SIZE);
     }
 
-    is->reposition(sbptr);
-    td->readRect(r, pf);
-    sbptr = is->pos();
+    mis->reposition(sbptr);
+    td->readRect(r, fb);
+    sbptr = mis->pos();
   }
   catch(Exception e) {
     fprintf(stderr, "ERROR: %s\n", e.str());

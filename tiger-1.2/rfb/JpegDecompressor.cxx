@@ -215,7 +215,7 @@ void JpegDecompressor::decompress(const rdr::U8 *jpegBuf, int jpegBufLen,
     jpeg_abort_decompress(dinfo);
     if (dstBufIsTemp && dstBuf) delete[] dstBuf;
     if (rowPointer) delete[] rowPointer;
-    throw Exception("Tight Decoding: Wrong JPEG data received.\n");
+    throw rdr::Exception("Tight Decoding: Wrong JPEG data received.\n");
   }
 
   while (dinfo->output_scanline < dinfo->output_height) {

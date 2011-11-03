@@ -30,20 +30,17 @@ namespace rfb {
 
   public:
     TightDecoder();
-    void readRect(const Rect& r, const PixelFormat &pf);
+    virtual void readRect(const Rect& r, CMsgHandler* handler);
     virtual ~TightDecoder();
 
   private:
-    void tightDecode8(rdr::InStream* is, const Rect& r);
-    void tightDecode16(rdr::InStream* is, const Rect& r);
-    void tightDecode32(rdr::InStream* is, const Rect& r);
+    void tightDecode8(const Rect& r);
+    void tightDecode16(const Rect& r);
+    void tightDecode32(const Rect& r);
 
-    void DecompressJpegRect8(rdr::InStream* is, rdr::U8* buf, int stride,
-                             const Rect& r);
-    void DecompressJpegRect16(rdr::InStream* is, rdr::U16* buf, int stride,
-                             const Rect& r);
-    void DecompressJpegRect32(rdr::InStream* is, rdr::U32* buf, int stride,
-                             const Rect& r);
+    void DecompressJpegRect8(const Rect& r);
+    void DecompressJpegRect16(const Rect& r);
+    void DecompressJpegRect32(const Rect& r);
 
     void FilterGradient8(rdr::InStream* is, rdr::U8* buf, int stride, 
                          const Rect& r, int dataSize);
@@ -54,13 +51,17 @@ namespace rfb {
     void FilterGradient32(rdr::InStream* is, rdr::U32* buf, int stride, 
                           const Rect& r, int dataSize);
 
-    void fillRect8(rdr::U8 *buf, int stride, const Rect& r, Pixel pix);
-    void fillRect16(rdr::U16 *buf, int stride, const Rect& r, Pixel pix);
-    void fillRect32(rdr::U32 *buf, int stride, const Rect& r, Pixel pix);
+    void directFillRect8(const Rect& r, Pixel pix);
+    void directFillRect16(const Rect& r, Pixel pix);
+    void directFillRect32(const Rect& r, Pixel pix);
 
+    CMsgHandler* handler;
+    rdr::InStream* is;
     rdr::ZlibInStream zis[4];
     JpegDecompressor jd;
-    PixelFormat pf;
+    PixelFormat clientpf;
+    PixelFormat serverpf;
+    bool directDecode;
   };
 }
 
