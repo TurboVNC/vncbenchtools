@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2010 D. R. Commander.  All Rights Reserved.
+ *  Copyright (C) 2010-2011 D. R. Commander.  All Rights Reserved.
  *  Copyright (C) 2005-2006 Sun Microsystems, Inc.  All Rights Reserved.
  *  Copyright (C) 2004 Landmark Graphics Corporation.  All Rights Reserved.
  *  Copyright (C) 2000, 2001 Const Kaplinsky.  All Rights Reserved.
@@ -32,6 +32,8 @@
 
 #ifndef __TURBOD_MT__
 #define __TURBOD_MT__
+
+#include <pthread.h>
 
 #define TVNC_MAXTHREADS 8
 
@@ -678,7 +680,7 @@ FilterGradientBPP (threadparam *t, int srcx, int srcy, int rectWidth, int numRow
 
     /* First pixel in a row */
     for (c = 0; c < 3; c++) {
-      pix[c] = (CARD16)((src[y*rectWidth] >> shift[c]) + thatRow[c] & max[c]);
+      pix[c] = (CARD16)(((src[y*rectWidth] >> shift[c]) + thatRow[c]) & max[c]);
       thisRow[c] = pix[c];
     }
     dst[y*dstw] = RGB_TO_PIXEL(BPP, pix[0], pix[1], pix[2]);
@@ -692,7 +694,7 @@ FilterGradientBPP (threadparam *t, int srcx, int srcy, int rectWidth, int numRow
 	} else if (est[c] < 0) {
 	  est[c] = 0;
 	}
-	pix[c] = (CARD16)((src[y*rectWidth+x] >> shift[c]) + est[c] & max[c]);
+	pix[c] = (CARD16)(((src[y*rectWidth+x] >> shift[c]) + est[c]) & max[c]);
 	thisRow[x*3+c] = pix[c];
       }
       dst[y*dstw+x] = RGB_TO_PIXEL(BPP, pix[0], pix[1], pix[2]);

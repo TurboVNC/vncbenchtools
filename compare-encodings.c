@@ -278,7 +278,7 @@ int main (int argc, char *argv[])
 {
   FILE *in;
   int i;
-  char buf[12], *filename = NULL;
+  char *filename = NULL;
   int err;
 
   if (argc < 2) {
@@ -336,9 +336,8 @@ static void show_usage (char *program_name)
 
 static int do_convert (FILE *in)
 {
-  int msg_type, n, bytes;
+  int msg_type, n;
   char buf[8];
-  size_t text_len;
 
   InitEverything (color_depth);
 
@@ -426,7 +425,7 @@ static int do_convert (FILE *in)
   printf("Raw rectangles   = %lu, pixels = %f mil\n", fcrect, (double)fcpixels/1000000.);
   #endif
 
-  printf("Avg. pixel count for %lu FB updates:  %f\n", total_rects,
+  printf("Avg. pixel count for %d FB updates:  %f\n", total_rects,
 	 (double)total_pixels/(double)total_rects);
   printf("\n");
   if(tndx==1)
@@ -477,7 +476,6 @@ static int parse_rectangle (FILE *in, int xpos, int ypos,
                             int width, int height, int rect_no, int enc)
 {
   char fname[80];
-  FILE *ppm;
   int err, i;
   int pixel_bytes;
 
@@ -510,7 +508,7 @@ static int parse_rectangle (FILE *in, int xpos, int ypos,
       pixel_bytes = 4;
     }
   } else {
-    fprintf (stderr, "Wrong encoding: 0x%02lX=%d.\n", enc, enc);
+    fprintf (stderr, "Wrong encoding: 0x%02X=%d.\n", enc, enc);
     return -1;
   }
 
@@ -792,7 +790,7 @@ static int handle_raw##bpp (FILE *in, int x, int y, int width, int height) \
     return -1;                                                             \
   }                                                                        \
                                                                            \
-  if (fread (data, 1, width * height * (bpp / 8), in)                      \
+  if ((int)fread (data, 1, width * height * (bpp / 8), in)                 \
     != width * height * (bpp / 8)) {                                       \
     fprintf (stderr, "Read error.\n");                                     \
     return -1;                                                             \
@@ -844,7 +842,8 @@ static int handle_hextile##bpp (FILE *in, int width, int height)           \
       }                                                                    \
                                                                            \
       if (subencoding & rfbHextileRaw) {                                   \
-        if (fread (data, 1, w * h * (bpp / 8), in) != w * h * (bpp / 8)) { \
+        if ((int)fread (data, 1, w * h * (bpp / 8), in)                    \
+          != w * h * (bpp / 8)) {                                          \
           fprintf (stderr, "Read error.\n");                               \
           return -1;                                                       \
         }                                                                  \
@@ -923,7 +922,7 @@ DEFINE_HANDLE_HEXTILE(32)
 static void copy_data (char *data, int rw, int rh,
                        int x, int y, int w, int h, int bpp)
 {
-  int px, py;
+  int py;
   int pixel_bytes;
 
   pixel_bytes = bpp / 8;
