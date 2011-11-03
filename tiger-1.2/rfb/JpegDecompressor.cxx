@@ -138,11 +138,12 @@ JpegDecompressor::~JpegDecompressor(void)
 }
 
 void JpegDecompressor::decompress(const rdr::U8 *jpegBuf, int jpegBufLen,
-  rdr::U8 *buf, const Rect& r, const PixelFormat& pf)
+  rdr::U8 *buf, int pitch, const Rect& r, const PixelFormat& pf)
 {
   int w = r.width();
   int h = r.height();
   int pixelsize;
+  int dstBufPitch;
   rdr::U8 *dstBuf = NULL;
   bool dstBufIsTemp = false;
   JSAMPROW *rowPointer = NULL;
@@ -161,6 +162,8 @@ void JpegDecompressor::decompress(const rdr::U8 *jpegBuf, int jpegBufLen,
   jpeg_read_header(dinfo, TRUE);
   dinfo->out_color_space = JCS_RGB;
   pixelsize = 3;
+  if (pitch == 0) pitch = w * pf.bpp / 8;
+  dstBufPitch = pitch;
 
 #ifdef JCS_EXTENSIONS
   // Try to have libjpeg output directly to our native format
@@ -197,11 +200,12 @@ void JpegDecompressor::decompress(const rdr::U8 *jpegBuf, int jpegBufLen,
   if (dinfo->out_color_space == JCS_RGB) {
     dstBuf = new rdr::U8[w * h * pixelsize];
     dstBufIsTemp = true;
+    dstBufPitch = w * pixelsize;
   }
 
   rowPointer = new JSAMPROW[h];
   for (int dy = 0; dy < h; dy++)
-    rowPointer[dy] = (JSAMPROW)(&dstBuf[dy * w * pixelsize]);
+    rowPointer[dy] = (JSAMPROW)(&dstBuf[dy * dstBufPitch]);
 
   jpeg_start_decompress(dinfo);
 
@@ -220,9 +224,7 @@ void JpegDecompressor::decompress(const rdr::U8 *jpegBuf, int jpegBufLen,
   }
 
   if (dinfo->out_color_space == JCS_RGB)
-    pf.bufferFromRGB((rdr::U8*)buf, dstBuf, w * h);
-
-  IMAGE_RECT(r, buf);
+    pf.bufferFromRGB((rdr::U8*)buf, dstBuf, w, pitch, h);
 
   jpeg_finish_decompress(dinfo);
 

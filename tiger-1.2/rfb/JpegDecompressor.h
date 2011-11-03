@@ -43,7 +43,7 @@ namespace rfb {
     JpegDecompressor(void);
     virtual ~JpegDecompressor();
 
-    void decompress(const rdr::U8 *, int, rdr::U8 *, const Rect&,
+    void decompress(const rdr::U8 *, int, rdr::U8 *, int, const Rect&,
                     const PixelFormat&);
 
   private:

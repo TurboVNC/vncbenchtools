@@ -1,6 +1,6 @@
 /* Copyright (C) 2000-2003 Constantin Kaplinsky.  All Rights Reserved.
  * Copyright 2004-2005 Cendio AB.
- * Copyright (C) 2011 D. R. Commander
+ * Copyright (C) 2011 D. R. Commander.  All Rights Reserved.
  *    
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,10 +37,6 @@ using namespace rfb;
 
 #define TIGHT_MAX_WIDTH 2048
 
-#define EXTRA_ARGS const PixelFormat &pf
-#define FILL_RECT(r, p) pb->fillRect(r, p)
-#define IMAGE_RECT(r, p) pb->imageRect(r, p)
-
 static FullFramePixelBuffer *pb = NULL;
 
 #include "tiger-1.2/rfb/JpegDecompressor.cxx"	
@@ -51,22 +47,6 @@ static FullFramePixelBuffer *pb = NULL;
 
 #if BPP == 8
 
-static rdr::U8* imageBuf = NULL;
-static int imageBufSize = 0;
-
-static rdr::U8* getImageBuf(int required, const PixelFormat& pf)
-{
-  int requiredBytes = required * (pf.bpp / 8);
-  int size = requiredBytes;
-
-  if (imageBufSize < size) {
-    imageBufSize = size;
-    delete [] imageBuf;
-    imageBuf = new rdr::U8[imageBufSize];
-  }
-  return imageBuf;
-}
-
 TightDecoder::TightDecoder()
 {
 }
@@ -75,14 +55,27 @@ TightDecoder::~TightDecoder()
 {
 }
 
+static MemInStream *is = NULL;
+
+void TightDecoder::readRect(const Rect& r, const PixelFormat &pf)
+{
+  this->pf = pf;
+  switch (pf.bpp) {
+  case 8:
+    tightDecode8 (is, r); break;
+  case 16:
+    tightDecode16(is, r); break;
+  case 32:
+    tightDecode32(is, r); break;
+  }
+}
+
 static TightDecoder *td = NULL;
 extern XImage *image;
-static MemInStream *is = NULL;
 
 #endif
 
 #define HandleTightBPP CONCAT2E(HandleTight,BPP)
-#define TIGHT_DECODE CONCAT2E(tightDecode,BPP)
 
 static Bool HandleTightBPP(int rx, int ry, int rw, int rh)
 {
@@ -110,13 +103,9 @@ static Bool HandleTightBPP(int rx, int ry, int rw, int rh)
       is = new MemInStream(sendBuf, SEND_BUF_SIZE);
     }
 
-    /* Uncompressed RGB24 JPEG data, before translated, can be up to 3
-       times larger, if VNC bpp is 8. */
-    rdr::U8* buf = getImageBuf(r.area()*3, pf);
-    MemInStream is(sendBuf, SEND_BUF_SIZE);
-    is.reposition(sbptr);
-    td->TIGHT_DECODE (r, &is, (PIXEL_T *) buf, pf);
-    sbptr = is.pos();
+    is->reposition(sbptr);
+    td->readRect(r, pf);
+    sbptr = is->pos();
   }
   catch(Exception e) {
     fprintf(stderr, "ERROR: %s\n", e.str());
@@ -126,6 +115,4 @@ static Bool HandleTightBPP(int rx, int ry, int rw, int rh)
 
 }
 
-#undef PIXEL_T
-#undef TIGHT_DECODE
 #undef HandleTightBPP

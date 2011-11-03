@@ -1,5 +1,6 @@
 /* Copyright (C) 2000-2003 Constantin Kaplinsky.  All Rights Reserved.
  * Copyright (C) 2004-2005 Cendio AB. All rights reserved.
+ * Copyright (C) 2011 D. R. Commander.  All Rights Reserved.
  *    
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -44,19 +45,17 @@ namespace rfb {
 #define TIGHT_DECODE TightDecoder::CONCAT2E(tightDecode,BPP)
 #define DECOMPRESS_JPEG_RECT TightDecoder::CONCAT2E(DecompressJpegRect,BPP)
 #define FILTER_GRADIENT TightDecoder::CONCAT2E(FilterGradient,BPP)
+#define FILL_RECT TightDecoder::CONCAT2E(fillRect,BPP)
 
 #define TIGHT_MIN_TO_COMPRESS 12
 
 // Main function implementing Tight decoder
 
-void TIGHT_DECODE (const Rect& r, rdr::InStream* is,
-                   PIXEL_T* buf
-#ifdef EXTRA_ARGS
-                      , EXTRA_ARGS
-#endif
-                      )
+void TIGHT_DECODE (rdr::InStream* is, const Rect& r)
 {
-  rdr::U8 *bytebuf = (rdr::U8*) buf;
+  int stride = r.width();
+  PIXEL_T *buf = (PIXEL_T *)pb->getPixelsRW(r, &stride);
+
   bool cutZeros = false;
 #if BPP == 32
   if (pf.is888()) {
@@ -78,18 +77,19 @@ void TIGHT_DECODE (const Rect& r, rdr::InStream* is,
   if (comp_ctl == rfbTightFill) {
     PIXEL_T pix;
     if (cutZeros) {
+      rdr::U8 bytebuf[3];
       is->readBytes(bytebuf, 3);
       pf.bufferFromRGB((rdr::U8*)&pix, bytebuf, 1, NULL);
     } else {
       pix = is->READ_PIXEL();
     }
-    FILL_RECT(r, pix);
+    FILL_RECT(buf, stride, r, pix);
     return;
   }
 
   // "JPEG" compression type.
   if (comp_ctl == rfbTightJpeg) {
-    DECOMPRESS_JPEG_RECT(r, is, buf, pf);
+    DECOMPRESS_JPEG_RECT(is, buf, stride, r);
     return;
   }
 
@@ -117,8 +117,8 @@ void TIGHT_DECODE (const Rect& r, rdr::InStream* is,
           pf.bufferFromRGB((rdr::U8*)&palette[i], elem, 1, NULL);
         }
       } else {
-	for (int i = 0; i < palSize; i++)
-	  palette[i] = is->READ_PIXEL();
+        for (int i = 0; i < palSize; i++)
+          palette[i] = is->READ_PIXEL();
       }
       break;
     case rfbTightFilterGradient: 
@@ -159,54 +159,69 @@ void TIGHT_DECODE (const Rect& r, rdr::InStream* is,
     if (useGradient) {
 #if BPP == 32
       if (cutZeros) {
-	FilterGradient24(r, input, dataSize, buf, pf);
+        FilterGradient24(input, buf, stride, r, dataSize);
       } else 
 #endif
-	{
-	  FILTER_GRADIENT(r, input, dataSize, buf, pf);
-	}
+      {
+        FILTER_GRADIENT(input, buf, stride, r, dataSize);
+      }
     } else {
+      int h = r.height();
+      PIXEL_T *ptr = buf;
       if (cutZeros) {
+        int w = r.width(), pad = stride - w;
         rdr::U8 elem[3];
-        for (int i = 0;i < r.area();i++) {
-          input->readBytes(elem, 3);
-          pf.bufferFromRGB((rdr::U8*)&buf[i], elem, 1, NULL);
+        while (h > 0) {
+          PIXEL_T *endOfRow = ptr + w;
+          while (ptr < endOfRow) {
+            input->readBytes(elem, 3);
+            pf.bufferFromRGB((rdr::U8*)ptr++, elem, 1, NULL);
+          }
+          ptr += pad;
+          h--;
         }
       } else {
-        input->readBytes(buf, dataSize); 
+        while (h > 0) {
+          input->readBytes(ptr, rowSize);
+          ptr += stride;
+          h--;
+        }
       }
     }
   } else {
-    int x, y, b;
+    int x, h = r.height(), w = r.width(), b, pad = stride - w;
     PIXEL_T *ptr = buf;
     rdr::U8 bits;
     if (palSize <= 2) {
       // 2-color palette
-      for (y = 0; y < r.height(); y++) {
-        for (x = 0; x < r.width() / 8; x++) {
+      while (h > 0) {
+        for (x = 0; x < w / 8; x++) {
           bits = input->readU8();
           for (b = 7; b >= 0; b--) {
             *ptr++ = palette[bits >> b & 1];
-	  }
+          }
         }
-        if (r.width() % 8 != 0) {
+        if (w % 8 != 0) {
           bits = input->readU8();
-          for (b = 7; b >= 8 - r.width() % 8; b--) {
+          for (b = 7; b >= 8 - w % 8; b--) {
             *ptr++ = palette[bits >> b & 1];
           }
         }
+        ptr += pad;
+        h--;
       }
     } else {
       // 256-color palette
-      for (y = 0; y < r.height(); y++) {
-        for (x = 0; x < r.width(); x++) {
+      while (h > 0) {
+        PIXEL_T *endOfRow = ptr + w;
+        while (ptr < endOfRow) {
           *ptr++ = palette[input->readU8()];
-	}
+        }
+        ptr += pad;
+        h--;
       }
     }
   }
-
-  IMAGE_RECT(r, buf);
 
   if (streamId != -1) {
     zis[streamId].reset();
@@ -214,8 +229,8 @@ void TIGHT_DECODE (const Rect& r, rdr::InStream* is,
 }
 
 void
-DECOMPRESS_JPEG_RECT(const Rect& r, rdr::InStream* is,
-                     PIXEL_T* buf, const PixelFormat &pf)
+DECOMPRESS_JPEG_RECT(rdr::InStream* is, PIXEL_T* buf, int stride,
+                     const Rect& r)
 {
   // Read length
   int compressedLen = is->readCompactLength();
@@ -230,7 +245,8 @@ DECOMPRESS_JPEG_RECT(const Rect& r, rdr::InStream* is,
   }
   is->readBytes(netbuf, compressedLen);
 
-  jd.decompress(netbuf, compressedLen, (rdr::U8 *)buf, r, pf);
+  jd.decompress(netbuf, compressedLen, (rdr::U8 *)buf,
+    stride * pf.bpp / 8, r, pf);
 
   delete [] netbuf;
 }
@@ -238,8 +254,8 @@ DECOMPRESS_JPEG_RECT(const Rect& r, rdr::InStream* is,
 #if BPP == 32
 
 void
-TightDecoder::FilterGradient24(const Rect& r, rdr::InStream* is, int dataSize,
-		 PIXEL_T* buf, const PixelFormat &pf)
+TightDecoder::FilterGradient24(rdr::InStream* is, PIXEL_T* buf, int stride, 
+                               const Rect& r, int dataSize)
 {
   int x, y, c;
   static rdr::U8 prevRow[TIGHT_MAX_WIDTH*3];
@@ -266,21 +282,21 @@ TightDecoder::FilterGradient24(const Rect& r, rdr::InStream* is, int dataSize,
       pix[c] = netbuf[y*rectWidth*3+c] + prevRow[c];
       thisRow[c] = pix[c];
     }
-    pf.bufferFromRGB((rdr::U8*)&buf[y*rectWidth], pix, 1, NULL);
+    pf.bufferFromRGB((rdr::U8*)&buf[y*stride], pix, 1, NULL);
 
     /* Remaining pixels of a row */
     for (x = 1; x < rectWidth; x++) {
       for (c = 0; c < 3; c++) {
-	est[c] = prevRow[x*3+c] + pix[c] - prevRow[(x-1)*3+c];
-	if (est[c] > 0xff) {
-	  est[c] = 0xff;
-	} else if (est[c] < 0) {
-	  est[c] = 0;
-	}
-	pix[c] = netbuf[(y*rectWidth+x)*3+c] + est[c];
-	thisRow[x*3+c] = pix[c];
+        est[c] = prevRow[x*3+c] + pix[c] - prevRow[(x-1)*3+c];
+        if (est[c] > 0xff) {
+          est[c] = 0xff;
+        } else if (est[c] < 0) {
+          est[c] = 0;
+        }
+        pix[c] = netbuf[(y*rectWidth+x)*3+c] + est[c];
+        thisRow[x*3+c] = pix[c];
       }
-      pf.bufferFromRGB((rdr::U8*)&buf[y*rectWidth+x], pix, 1, NULL);
+      pf.bufferFromRGB((rdr::U8*)&buf[y*stride+x], pix, 1, NULL);
     }
 
     memcpy(prevRow, thisRow, sizeof(prevRow));
@@ -292,8 +308,8 @@ TightDecoder::FilterGradient24(const Rect& r, rdr::InStream* is, int dataSize,
 #endif
 
 void
-FILTER_GRADIENT(const Rect& r, rdr::InStream* is, int dataSize,
-	       PIXEL_T* buf, const PixelFormat &pf)
+FILTER_GRADIENT(rdr::InStream* is, PIXEL_T* buf, int stride, 
+                const Rect& r, int dataSize)
 {
   int x, y, c;
   static rdr::U8 prevRow[TIGHT_MAX_WIDTH*sizeof(PIXEL_T)];
@@ -322,7 +338,7 @@ FILTER_GRADIENT(const Rect& r, rdr::InStream* is, int dataSize,
 
     memcpy(thisRow, pix, sizeof(pix));
 
-    pf.bufferFromRGB((rdr::U8*)&buf[y*rectWidth], pix, 1, NULL);
+    pf.bufferFromRGB((rdr::U8*)&buf[y*stride], pix, 1, NULL);
 
     /* Remaining pixels of a row */
     for (x = 1; x < rectWidth; x++) {
@@ -341,7 +357,7 @@ FILTER_GRADIENT(const Rect& r, rdr::InStream* is, int dataSize,
 
       memcpy(&thisRow[x*3], pix, sizeof(pix));
 
-      pf.bufferFromRGB((rdr::U8*)&buf[y*rectWidth+x], pix, 1, NULL);
+      pf.bufferFromRGB((rdr::U8*)&buf[y*stride+x], pix, 1, NULL);
     }
 
     memcpy(prevRow, thisRow, sizeof(prevRow));
@@ -350,9 +366,32 @@ FILTER_GRADIENT(const Rect& r, rdr::InStream* is, int dataSize,
   delete [] netbuf;
 }
 
+void
+FILL_RECT(PIXEL_T *buf, int stride, const Rect& r, Pixel pix) {
+  int w = r.width(), h = r.height();
+#if BPP != 8
+  PIXEL_T *ptr = buf;
+  PIXEL_T *endOfRow = ptr + w;
+#endif
+
+  while (h > 0) {
+#if BPP == 8
+    memset(buf, pix, w);
+#else
+    while (ptr < endOfRow) {
+      *ptr++ = pix;
+    }
+#endif
+    buf += stride;
+    h--;
+  }
+}
+
 #undef TIGHT_MIN_TO_COMPRESS
+#undef PIXEL_T
 #undef READ_PIXEL
 #undef TIGHT_DECODE
 #undef DECOMPRESS_JPEG_RECT
 #undef FILTER_GRADIENT
+#undef FILL_RECT
 }
