@@ -50,6 +50,7 @@ void InitEverything (int color_depth)
   for (i = 0; i < MAX_ENCODINGS; i++) {
     rfbClient.zsActive[i] = FALSE;
   }
+  rfbClient.reset = TRUE;
 
   rfbClient.format.depth = color_depth;
   rfbClient.format.bitsPerPixel = color_depth;

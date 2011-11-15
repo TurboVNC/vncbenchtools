@@ -50,9 +50,15 @@ static rdr::U8* getImageBuf(int required, const PixelFormat& pf)
 #include "tiger-1.2/rdr/ZlibOutStream.cxx"
 #include "tiger-1.2/rfb/JpegCompressor.cxx"
 #include "tiger-1.2/rfb/TightEncoder.cxx"
+#include "tiger-1.2/rfb/ComparingUpdateTracker.cxx"
 
 static TightEncoder *te = NULL;
 static TransImageGetter image_getter;
+
+Bool compareFB = FALSE;
+
+static ComparingUpdateTracker *cut = NULL;
+static FullFramePixelBuffer *fb = NULL;
 
 Bool rfbSendRectEncodingTight(rfbClientPtr _cl, int x, int y, int w, int h)
 {
@@ -60,16 +66,28 @@ Bool rfbSendRectEncodingTight(rfbClientPtr _cl, int x, int y, int w, int h)
     cl = _cl;
     Rect r(x, y, x + w, y + h);
 
-    int i;
-    for (i = 0; i < 4; i++) {
-      if (cl->zsActive[i]) break;
+    if (cl->reset) {
+      if (te) { delete te;  te = NULL; }
+      if (fb) { delete fb;  fb = NULL; }
+      if (cut) { delete cut;  cut = NULL; }
+      cl->reset = FALSE;
     }
-    if (i == 4 && te) { delete te;  te = NULL; }
     if (!te) te = new TightEncoder;
 
     te->setCompressLevel(compressLevel);
     te->setQualityLevel(qualityLevel);
-    te->writeRect(r, &image_getter, NULL);
+    if (compareFB) {
+      PixelFormat spf(rfbServerFormat.bitsPerPixel, rfbServerFormat.depth,
+        rfbServerFormat.bigEndian==1, rfbServerFormat.trueColour==1,
+        rfbServerFormat.redMax, rfbServerFormat.greenMax,
+        rfbServerFormat.blueMax, rfbServerFormat.redShift,
+        rfbServerFormat.greenShift, rfbServerFormat.blueShift);
+      if (!fb) fb = new FullFramePixelBuffer(spf, rfbScreen.width,
+        rfbScreen.height, (rdr::U8 *)rfbScreen.pfbMemory, NULL);
+      if (!cut) cut = new ComparingUpdateTracker(fb);
+      if (cut->compareRect(r)) te->writeRect(r, &image_getter, NULL);
+    }
+    else te->writeRect(r, &image_getter, NULL);
   }
   catch (Exception e) {
     fprintf(stderr, "ERROR: %s\n", e.str());

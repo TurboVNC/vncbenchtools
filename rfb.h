@@ -105,6 +105,8 @@ typedef struct rfbClientRec {
 
     int zsLevel[4];
 
+    Bool reset;
+
 } rfbClientRec, *rfbClientPtr;
 
 extern rfbClientRec rfbClient;
