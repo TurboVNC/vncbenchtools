@@ -18,8 +18,8 @@
 #ifndef __RFB_TIGHTENCODER_H__
 #define __RFB_TIGHTENCODER_H__
 
-#include "../rdr/MemOutStream.h"
-#include "../rdr/ZlibOutStream.h"
+#include <rdr/MemOutStream.h>
+#include <rdr/ZlibOutStream.h>
 
 // FIXME: Check if specifying extern "C" is really necessary.
 #include <stdio.h>

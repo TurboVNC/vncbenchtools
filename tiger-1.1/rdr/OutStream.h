@@ -24,7 +24,7 @@
 #ifndef __RDR_OUTSTREAM_H__
 #define __RDR_OUTSTREAM_H__
 
-#include "types.h"
+#include <rdr/types.h>
 #include <string.h> // for memcpy
 
 namespace rdr {

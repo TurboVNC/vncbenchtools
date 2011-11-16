@@ -16,8 +16,8 @@
  * USA.
  */
 
-#include "ZlibInStream.h"
-#include "Exception.h"
+#include <rdr/ZlibInStream.h>
+#include <rdr/Exception.h>
 #include <zlib.h>
 
 using namespace rdr;

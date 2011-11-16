@@ -26,8 +26,8 @@
 // GET_IMAGE_INTO_BUF - gets a rectangle of pixel data into a buffer
 //
 
-#include "../rdr/OutStream.h"
-#include "../rdr/ZlibOutStream.h"
+#include <rdr/OutStream.h>
+#include <rdr/ZlibOutStream.h>
 #include <assert.h>
 
 namespace rfb {

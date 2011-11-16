@@ -18,7 +18,7 @@
  * USA.
  */
 
-#include "tiger-1.1/rfb/TightDecoder.h"
+#include <rfb/TightDecoder.h>
 #include <stdio.h> /* jpeglib.h needs FILE */
 extern "C" {
 #include <jpeglib.h>
@@ -28,16 +28,10 @@ using namespace rfb;
 
 #if BPP == 8
 
-#ifndef TIGER_BOTH
-#include "tiger-1.1/rdr/Exception.cxx"
-#include "tiger-1.1/rfb/PixelFormat.cxx"
-#else
-#include "tiger-1.1/rdr/Exception.h"
-#include "tiger-1.1/rfb/PixelFormat.h"
-#endif
-#include "tiger-1.1/rfb/PixelBuffer.cxx"
-#include "tiger-1.1/rdr/ZlibInStream.cxx"
-#include "tiger-1.1/rdr/MemInStream.h"
+#include <rdr/Exception.h>
+#include <rfb/PixelFormat.h>
+#include <rfb/PixelBuffer.h>
+#include <rdr/MemInStream.h>
 
 #define TIGHT_MAX_WIDTH 2048
 
@@ -148,7 +142,7 @@ JpegSetSrcManager(j_decompress_ptr cinfo, char *compressedData, int compressedLe
 
 static TightDecoder *td = NULL;
 extern XImage *image;
-static MemInStream *is = NULL;
+static rdr::MemInStream *is = NULL;
 
 #endif
 
@@ -177,7 +171,7 @@ static Bool HandleTightBPP(int rx, int ry, int rw, int rh)
     if (!pb) pb = new FullFramePixelBuffer(pf, image->width, image->height,
       (rdr::U8 *)image->data, NULL);
     if (!is) {
-      is = new MemInStream(sendBuf, SEND_BUF_SIZE);
+      is = new rdr::MemInStream(sendBuf, SEND_BUF_SIZE);
     }
 
     /* Uncompressed RGB24 JPEG data, before translated, can be up to 3
@@ -187,7 +181,7 @@ static Bool HandleTightBPP(int rx, int ry, int rw, int rh)
     TIGHT_DECODE (r, is, td->zis, (PIXEL_T *) buf, pf);
     sbptr = is->pos();
   }
-  catch(Exception e) {
+  catch(rdr::Exception e) {
     fprintf(stderr, "ERROR: %s\n", e.str());
     return FALSE;
   }

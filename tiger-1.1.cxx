@@ -16,16 +16,13 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
  * USA.
  */
-#include "tiger-1.1/rfb/encodings.h"
-#include "tiger-1.1/rfb/TightEncoder.h"
-#include "tiger-1.1/rdr/ZlibOutStream.cxx"
-#include "tiger-1.1/rfb/PixelFormat.cxx"
-#include "tiger-1.1/rfb/Rect.h"
-#include "tiger-1.1/rdr/Exception.h"
-#include "tiger-1.1/rdr/Exception.cxx"
-extern "C" {
-  #include "rfb.h"
-}
+#include <rfb/encodings.h>
+#include <rfb/TightEncoder.h>
+#include <rdr/ZlibOutStream.h>
+#include <rfb/PixelFormat.h>
+#include <rfb/Rect.h>
+#include <rdr/Exception.h>
+#include "rfb.h"
 
 using namespace rfb;
 
@@ -100,13 +97,13 @@ unsigned long solidrect=0, solidpixels=0, monorect=0, monopixels=0, ndxrect=0,
 //
 
 #define BPP 8
-#include "tiger-1.1/rfb/tightEncode.h"
+#include <rfb/tightEncode.h>
 #undef BPP
 #define BPP 16
-#include "tiger-1.1/rfb/tightEncode.h"
+#include <rfb/tightEncode.h>
 #undef BPP
 #define BPP 32
-#include "tiger-1.1/rfb/tightEncode.h"
+#include <rfb/tightEncode.h>
 #undef BPP
 
 rdr::U8* getImageBuf(int required, const PixelFormat& pf)
@@ -171,7 +168,7 @@ void writeSubrect(const Rect& r, const PixelFormat& pf)
 
     /* Send pending data if there is more than 128 bytes. */
   if(ublen > 128)
-    if(!rfbSendUpdateBuf(cl)) throw Exception("rfbSendUpdateBuf() failed");
+    if(!rfbSendUpdateBuf(cl)) throw rdr::Exception("rfbSendUpdateBuf() failed");
 
   switch (cl->format.bitsPerPixel) {
   case 8:
@@ -184,7 +181,7 @@ void writeSubrect(const Rect& r, const PixelFormat& pf)
 
   rfbFramebufferUpdateRectHeader rect;
   if(ublen + sz_rfbFramebufferUpdateRectHeader > UPDATE_BUF_SIZE)
-    if(!rfbSendUpdateBuf(cl)) throw Exception("rfbSendUpdateBuf() failed");
+    if(!rfbSendUpdateBuf(cl)) throw rdr::Exception("rfbSendUpdateBuf() failed");
 
   rect.r.x = Swap16IfLE(r.tl.x);
   rect.r.y = Swap16IfLE(r.tl.y);
@@ -205,7 +202,7 @@ void writeSubrect(const Rect& r, const PixelFormat& pf)
        portionLen = compressedLen - i;
     }
     if(ublen + portionLen > UPDATE_BUF_SIZE)
-      if(!rfbSendUpdateBuf(cl)) throw Exception("rfbSendUpdateBuf() failed");
+      if(!rfbSendUpdateBuf(cl)) throw rdr::Exception("rfbSendUpdateBuf() failed");
     memcpy(&updateBuf[ublen], &buf[i], portionLen);
     ublen += portionLen;
   }
@@ -227,11 +224,11 @@ Bool rfbSendRectEncodingTight(rfbClientPtr _cl, int x, int y, int w, int h)
       if(cl->zsActive[i]) break;
     }
     if(i==4 && zos) {delete [] zos;  zos=NULL;}
-    if(!zos) zos = new ZlibOutStream[4];
+    if(!zos) zos = new rdr::ZlibOutStream[4];
 
     writeRect(r, pf);
   }
-  catch(Exception e) {
+  catch(rdr::Exception e) {
     fprintf(stderr, "ERROR: %s\n", e.str());
     return FALSE;
   }
