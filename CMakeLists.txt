@@ -34,44 +34,6 @@ include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
 
 set(LINK_LIBRARIES z)
 
-if(ENCODER MATCHES tiger-*)
-  file(REMOVE tiger.cxx)
-  add_custom_command(OUTPUT tiger.cxx
-    COMMAND ln -fs ${CMAKE_SOURCE_DIR}/${ENCODER}.cxx tiger.cxx)
-  add_definitions(-DHAVE_VSNPRINTF -DHAVE_SNPRINTF)
-  include_directories(${CMAKE_SOURCE_DIR}/${ENCODER})
-  set(SOURCES ${SOURCES} ${CMAKE_BINARY_DIR}/tiger.cxx)
-  add_subdirectory(${ENCODER})
-  set(LINK_LIBRARIES ${LINK_LIBRARIES} tigervnc)
-else()
-  file(REMOVE tight.c)
-  add_custom_command(OUTPUT tight.c
-    COMMAND ln -fs ${CMAKE_SOURCE_DIR}/${ENCODER}.c tight.c)
-  set(SOURCES ${SOURCES} ${CMAKE_BINARY_DIR}/tight.c)
-endif()
-
-if(DECODER MATCHES tiger-*)
-  file(REMOVE tigerd.cxx)
-  add_custom_command(OUTPUT tigerd.cxx
-    COMMAND ln -fs ${CMAKE_SOURCE_DIR}/${DECODER}d.cxx tigerd.cxx)
-  add_definitions(-DTIGERD -DHAVE_VSNPRINTF -DHAVE_SNPRINTF)
-  include_directories(${CMAKE_SOURCE_DIR}/${DECODER})
-  set_source_files_properties(compare-encodings.c PROPERTIES
-    OBJECT_DEPENDS ${CMAKE_BINARY_DIR}/tigerd.cxx
-    LANGUAGE CXX)
-  if(NOT DECODER STREQUAL ENCODER)
-    add_subdirectory(${DECODER})
-  endif()
-  set(LINK_LIBRARIES ${LINK_LIBRARIES} tigervnc)
-else()
-  file(REMOVE tightd.c)
-  add_custom_command(OUTPUT tightd.c
-    COMMAND ln -fs ${CMAKE_SOURCE_DIR}/${DECODER}d.c tightd.c)
-  set(DEPENDENCIES tightd.c)
-  set_source_files_properties(compare-encodings.c PROPERTIES
-    OBJECT_DEPENDS ${CMAKE_BINARY_DIR}/tightd.c)
-endif()
-
 if(ENCODER MATCHES tig* OR DECODER MATCHES tig*)
   # Check for libjpeg
   find_package(JPEG REQUIRED)
@@ -112,11 +74,50 @@ if(ENCODER MATCHES tig* OR DECODER MATCHES tig*)
   endif()
 
   set(LINK_LIBRARIES ${LINK_LIBRARIES} ${JPEG_LIBRARIES})
+  include_directories(${JPEG_INCLUDE_DIR})
 endif()
 
 if(ENCODER MATCHES turbo-* OR DECODER MATCHES turbo-*)
   include(cmakescripts/FindTurboJPEG.cmake)
   set(LINK_LIBRARIES ${LINK_LIBRARIES} ${TJPEG_LIBRARY})
+endif()
+
+if(ENCODER MATCHES tiger-*)
+  file(REMOVE tiger.cxx)
+  add_custom_command(OUTPUT tiger.cxx
+    COMMAND ln -fs ${CMAKE_SOURCE_DIR}/${ENCODER}.cxx tiger.cxx)
+  add_definitions(-DHAVE_VSNPRINTF -DHAVE_SNPRINTF)
+  include_directories(${CMAKE_SOURCE_DIR}/${ENCODER})
+  set(SOURCES ${SOURCES} ${CMAKE_BINARY_DIR}/tiger.cxx)
+  add_subdirectory(${ENCODER})
+  set(LINK_LIBRARIES tigervnc ${LINK_LIBRARIES})
+else()
+  file(REMOVE tight.c)
+  add_custom_command(OUTPUT tight.c
+    COMMAND ln -fs ${CMAKE_SOURCE_DIR}/${ENCODER}.c tight.c)
+  set(SOURCES ${SOURCES} ${CMAKE_BINARY_DIR}/tight.c)
+endif()
+
+if(DECODER MATCHES tiger-*)
+  file(REMOVE tigerd.cxx)
+  add_custom_command(OUTPUT tigerd.cxx
+    COMMAND ln -fs ${CMAKE_SOURCE_DIR}/${DECODER}d.cxx tigerd.cxx)
+  add_definitions(-DTIGERD -DHAVE_VSNPRINTF -DHAVE_SNPRINTF)
+  include_directories(${CMAKE_SOURCE_DIR}/${DECODER})
+  set_source_files_properties(compare-encodings.c PROPERTIES
+    OBJECT_DEPENDS ${CMAKE_BINARY_DIR}/tigerd.cxx
+    LANGUAGE CXX)
+  if(NOT DECODER STREQUAL ENCODER)
+    add_subdirectory(${DECODER})
+  endif()
+  set(LINK_LIBRARIES tigervnc ${LINK_LIBRARIES})
+else()
+  file(REMOVE tightd.c)
+  add_custom_command(OUTPUT tightd.c
+    COMMAND ln -fs ${CMAKE_SOURCE_DIR}/${DECODER}d.c tightd.c)
+  set(DEPENDENCIES tightd.c)
+  set_source_files_properties(compare-encodings.c PROPERTIES
+    OBJECT_DEPENDS ${CMAKE_BINARY_DIR}/tightd.c)
 endif()
 
 add_executable(compare-encodings ${SOURCES})
