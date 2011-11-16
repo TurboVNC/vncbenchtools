@@ -16,9 +16,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
  * USA.
  */
-#include "tiger-1.2/rdr/OutStream.h"
-#include "tiger-1.2/rfb/encodings.h"
-#include "tiger-1.2/rfb/TightEncoder.h"
+#include <rdr/OutStream.h>
+#include <rfb/encodings.h>
+#include <rfb/Exception.h>
+#include <rfb/TightEncoder.h>
 
 using namespace rfb;
 
@@ -79,13 +80,13 @@ const int TightEncoder::defaultCompressLevel = 1;
 //
 
 #define BPP 8
-#include "tiger-1.2/rfb/tightEncode.h"
+#include <rfb/tightEncode.h>
 #undef BPP
 #define BPP 16
-#include "tiger-1.2/rfb/tightEncode.h"
+#include <rfb/tightEncode.h>
 #undef BPP
 #define BPP 32
-#include "tiger-1.2/rfb/tightEncode.h"
+#include <rfb/tightEncode.h>
 #undef BPP
 
 TightEncoder::TightEncoder()

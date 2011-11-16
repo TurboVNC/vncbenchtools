@@ -24,8 +24,8 @@
 #ifndef __RFB_PIXELFORMAT_H__
 #define __RFB_PIXELFORMAT_H__
 
-#include "Pixel.h"
-#include "ColourMap.h"
+#include <rfb/Pixel.h>
+#include <rfb/ColourMap.h>
 
 namespace rdr { class InStream; class OutStream; }
 
@@ -94,6 +94,6 @@ namespace rfb {
   };
 }
 
-#include "PixelFormat.inl"
+#include <rfb/PixelFormat.inl>
 
 #endif

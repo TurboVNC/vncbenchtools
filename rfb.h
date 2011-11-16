@@ -21,6 +21,9 @@
  *  USA.
  */
 
+#ifndef __RFB_H__
+#define __RFB_H__
+
 #include <zlib.h>
 
 typedef unsigned char  CARD8;
@@ -217,4 +220,6 @@ extern Bool ReadFromRFBServer(char *out, unsigned int n);
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif

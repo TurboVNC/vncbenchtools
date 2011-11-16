@@ -25,9 +25,9 @@
 #ifndef __RFB_JPEGCOMPRESSOR_H__
 #define __RFB_JPEGCOMPRESSOR_H__
 
-#include "../rdr/MemOutStream.h"
-#include "PixelFormat.h"
-#include "Rect.h"
+#include <rdr/MemOutStream.h>
+#include <rfb/PixelFormat.h>
+#include <rfb/Rect.h>
 
 struct jpeg_compress_struct;
 

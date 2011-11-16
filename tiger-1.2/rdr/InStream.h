@@ -24,7 +24,7 @@
 #ifndef __RDR_INSTREAM_H__
 #define __RDR_INSTREAM_H__
 
-#include "types.h"
+#include <rdr/types.h>
 #include <string.h> // for memcpy
 
 namespace rdr {

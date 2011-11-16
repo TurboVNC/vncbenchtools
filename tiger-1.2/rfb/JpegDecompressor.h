@@ -26,8 +26,8 @@
 #ifndef __RFB_JPEGDECOMPRESSOR_H__
 #define __RFB_JPEGDECOMPRESSOR_H__
 
-#include "PixelFormat.h"
-#include "Rect.h"
+#include <rfb/PixelFormat.h>
+#include <rfb/Rect.h>
 
 struct jpeg_decompress_struct;
 

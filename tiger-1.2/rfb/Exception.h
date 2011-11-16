@@ -15,17 +15,23 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
  * USA.
  */
-#ifndef __RFB_IMAGEGETTER_H__
-#define __RFB_IMAGEGETTER_H__
+#ifndef __RFB_EXCEPTION_H__
+#define __RFB_EXCEPTION_H__
 
-#include <rfb/Rect.h>
+#include <rdr/Exception.h>
 
 namespace rfb {
-  class ImageGetter {
-  public:
-    virtual void getImage(void* imageBuf,
-                          const Rect& r, int stride=0) = 0;
-    virtual ~ImageGetter() {}
+  typedef rdr::Exception Exception;
+  struct AuthFailureException : public Exception {
+    AuthFailureException(const char* s="Authentication failure")
+      : Exception(s) {}
+  };
+  struct AuthCancelledException : public rfb::Exception {
+    AuthCancelledException(const char* s="Authentication cancelled")
+      : Exception(s) {}
+  };
+  struct ConnFailedException : public Exception {
+    ConnFailedException(const char* s="Connection failed") : Exception(s) {}
   };
 }
 #endif

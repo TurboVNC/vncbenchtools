@@ -28,6 +28,10 @@
 
 #include <assert.h>
 
+extern rdr::U8* getImageBuf(int, const PixelFormat&);
+extern unsigned long solidrect, solidpixels, monorect, monopixels, ndxrect,
+  ndxpixels, jpegrect, jpegpixels, fcrect, fcpixels, gradrect, gradpixels;
+
 namespace rfb {
 
 // CONCAT2E concatenates its arguments, expanding them if they are macros

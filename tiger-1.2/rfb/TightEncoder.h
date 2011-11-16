@@ -19,10 +19,10 @@
 #ifndef __RFB_TIGHTENCODER_H__
 #define __RFB_TIGHTENCODER_H__
 
-#include "../rdr/MemOutStream.h"
-#include "../rdr/ZlibOutStream.h"
-#include "JpegCompressor.h"
-#include "TransImageGetter.h"
+#include <rdr/MemOutStream.h>
+#include <rdr/ZlibOutStream.h>
+#include <rfb/TransImageGetter.h>
+#include <rfb/JpegCompressor.h>
 
 // FIXME: Check if specifying extern "C" is really necessary.
 #include <stdio.h>

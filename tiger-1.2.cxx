@@ -16,16 +16,16 @@
  * USA.
  */
 
-extern "C" {
-  #include "rfb.h"
-}
+#include "rfb.h"
 
 static int compressLevel = 1;
 static int qualityLevel = 8;
 
-#include "tiger-1.2/rfb/PixelFormat.cxx"
+#include <rfb/PixelFormat.h>
 
-static rfbClientPtr cl = NULL;
+using namespace rfb;
+
+rfbClientPtr cl = NULL;
 static rdr::U8* imageBuf = NULL;
 static int imageBufSize = 0;
 
@@ -33,7 +33,7 @@ unsigned long solidrect=0, solidpixels=0, monorect=0, monopixels=0, ndxrect=0,
   ndxpixels=0, jpegrect=0, jpegpixels=0, fcrect=0, fcpixels=0, gradrect=0,
   gradpixels=0;
 
-static rdr::U8* getImageBuf(int required, const PixelFormat& pf)
+rdr::U8* getImageBuf(int required, const PixelFormat& pf)
 {
   int requiredBytes = required * (pf.bpp / 8);
   int size = requiredBytes;
@@ -46,11 +46,9 @@ static rdr::U8* getImageBuf(int required, const PixelFormat& pf)
   return imageBuf;
 }
 
-#include "tiger-1.2/rdr/Exception.cxx"
-#include "tiger-1.2/rdr/ZlibOutStream.cxx"
-#include "tiger-1.2/rfb/JpegCompressor.cxx"
-#include "tiger-1.2/rfb/TightEncoder.cxx"
-#include "tiger-1.2/rfb/ComparingUpdateTracker.cxx"
+#include <rdr/Exception.h>
+#include <rfb/TightEncoder.h>
+#include <rfb/ComparingUpdateTracker.h>
 
 static TightEncoder *te = NULL;
 static TransImageGetter image_getter;
@@ -89,7 +87,7 @@ Bool rfbSendRectEncodingTight(rfbClientPtr _cl, int x, int y, int w, int h)
     }
     else te->writeRect(r, &image_getter, NULL);
   }
-  catch (Exception e) {
+  catch (rdr::Exception e) {
     fprintf(stderr, "ERROR: %s\n", e.str());
     return FALSE;
   }

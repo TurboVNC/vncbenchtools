@@ -18,30 +18,22 @@
  * USA.
  */
 
-#include "tiger-1.2/rfb/CMsgHandler.h"
-#include "tiger-1.2/rfb/TightDecoder.h"
+#include <rfb/CMsgHandler.h>
+#include <rfb/TightDecoder.h>
 
 using namespace rfb;
 
 #if BPP == 8
 
-#ifndef TIGER_BOTH
-#include "tiger-1.2/rdr/Exception.cxx"
-#include "tiger-1.2/rfb/PixelFormat.cxx"
-#else
-#include "tiger-1.2/rdr/Exception.h"
-#include "tiger-1.2/rfb/PixelFormat.h"
-#endif
-#include "tiger-1.2/rfb/PixelBuffer.cxx"
-#include "tiger-1.2/rdr/ZlibInStream.cxx"
-#include "tiger-1.2/rdr/MemInStream.h"
+#include <rdr/Exception.h>
+#include <rfb/PixelFormat.h>
+#include <rfb/PixelBuffer.h>
+#include <rdr/MemInStream.h>
 
 #define TIGHT_MAX_WIDTH 2048
 
 #define FILL_RECT(r, p) handler->fillRect(r, p)
 #define IMAGE_RECT(r, p) handler->imageRect(r, p)
-
-#include "tiger-1.2/rfb/JpegDecompressor.cxx"	
 
 static rdr::U8* imageBuf = NULL;
 static int imageBufSize = 0;
@@ -61,7 +53,7 @@ static rdr::U8* getImageBuf(int required, const PixelFormat& pf)
 
 #endif
 
-#include "tiger-1.2/rfb/tightDecode.h"
+#include <rfb/tightDecode.h>
 
 #if BPP == 8
 
@@ -73,7 +65,7 @@ TightDecoder::~TightDecoder()
 {
 }
 
-static MemInStream *mis = NULL;
+static rdr::MemInStream *mis = NULL;
 
 class FrameBuffer : public CMsgHandler
 {
@@ -175,7 +167,7 @@ static Bool HandleTightBPP(int rx, int ry, int rw, int rh)
     if (!fb) fb = new FrameBuffer(image->width, image->height,
       (rdr::U8 *)image->data);
     if (!mis) {
-      mis = new MemInStream(sendBuf, SEND_BUF_SIZE);
+      mis = new rdr::MemInStream(sendBuf, SEND_BUF_SIZE);
     }
 
     mis->reposition(sbptr);

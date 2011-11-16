@@ -24,7 +24,10 @@
 #ifndef __RFB_TRANSIMAGEGETTER_H__
 #define __RFB_TRANSIMAGEGETTER_H__
 
-#include "Rect.h"
+#include <rfb/Rect.h>
+#include "rfb.h"
+
+extern rfbClientPtr cl;
 
 namespace rfb {
 

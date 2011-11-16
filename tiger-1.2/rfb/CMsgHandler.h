@@ -1,5 +1,5 @@
 /* Copyright (C) 2002-2005 RealVNC Ltd.  All Rights Reserved.
- * Copyright 2009 Pierre Ossman for Cendio AB
+ * Copyright 2009-2011 Pierre Ossman for Cendio AB
  * Copyright (C) 2011 D. R. Commander.  All Rights Reserved.
  * 
  * This is free software; you can redistribute it and/or modify
@@ -24,10 +24,10 @@
 #ifndef __RFB_CMSGHANDLER_H__
 #define __RFB_CMSGHANDLER_H__
 
-#include "../rdr/types.h"
-#include "Pixel.h"
-#include "PixelFormat.h"
-#include "Rect.h"
+#include <rdr/types.h>
+#include <rfb/Pixel.h>
+#include <rfb/PixelFormat.h>
+#include <rfb/Rect.h>
 
 namespace rdr { class InStream; }
 

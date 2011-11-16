@@ -21,7 +21,10 @@
 // The PixelBuffer class encapsulates the PixelFormat and dimensions
 // of a block of pixel data.
 
-#include "tiger-1.2/rfb/PixelBuffer.h"
+#include <rfb/Exception.h>
+#include <stdio.h>
+#include <string.h>
+#include <rfb/PixelBuffer.h>
 
 using namespace rfb;
 using namespace rdr;

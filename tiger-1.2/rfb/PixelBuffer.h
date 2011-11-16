@@ -24,11 +24,11 @@
 #ifndef __RFB_PIXEL_BUFFER_H__
 #define __RFB_PIXEL_BUFFER_H__
 
-#include "ImageGetter.h"
-#include "PixelFormat.h"
-#include "ColourMap.h"
-#include "Rect.h"
-#include "Pixel.h"
+#include <rfb/ImageGetter.h>
+#include <rfb/PixelFormat.h>
+#include <rfb/ColourMap.h>
+#include <rfb/Rect.h>
+#include <rfb/Pixel.h>
 
 namespace rfb {
 

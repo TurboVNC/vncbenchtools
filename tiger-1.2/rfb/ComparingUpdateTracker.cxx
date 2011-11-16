@@ -18,9 +18,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <vector>
-#include "tiger-1.2/rdr/types.h"
-#include "tiger-1.2/rdr/Exception.h"
-#include "tiger-1.2/rfb/ComparingUpdateTracker.h"
+#include <rdr/types.h>
+#include <rfb/Exception.h>
+#include <rfb/ComparingUpdateTracker.h>
 
 using namespace rfb;
 

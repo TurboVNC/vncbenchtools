@@ -17,10 +17,11 @@
  * USA.
  */
 
-#include "tiger-1.2/rfb/JpegCompressor.h"
-#include "tiger-1.2/rdr/Exception.h"
-#include "tiger-1.2/rfb/Rect.h"
-#include "tiger-1.2/rfb/PixelFormat.h"
+#include <rfb/JpegCompressor.h>
+#include <rdr/Exception.h>
+#include <rfb/Rect.h>
+#include <rfb/PixelFormat.h>
+#include <os/print.h>
 
 #include <stdio.h>
 extern "C" {

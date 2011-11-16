@@ -27,8 +27,9 @@
 // FILL_RECT          - fill a rectangle with a single color
 // IMAGE_RECT         - draw a rectangle of pixel data from a buffer
 
-#include "../rdr/InStream.h"
-#include "../rdr/ZlibInStream.h"
+#include <rdr/InStream.h>
+#include <rdr/ZlibInStream.h>
+#include <rfb/Exception.h>
 #include <assert.h>
 
 namespace rfb {

@@ -1,4 +1,6 @@
-/* Copyright (C) 2002-2005 RealVNC Ltd.  All Rights Reserved.
+/* 
+ * Copyright (C) 2004 Red Hat Inc.
+ * Copyright (C) 2010 TigerVNC Team
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,17 +17,19 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
  * USA.
  */
-#ifndef __RFB_IMAGEGETTER_H__
-#define __RFB_IMAGEGETTER_H__
 
-#include <rfb/Rect.h>
+#ifndef __RDR_TLSEXCEPTION_H__
+#define __RDR_TLSEXCEPTION_H__
 
-namespace rfb {
-  class ImageGetter {
-  public:
-    virtual void getImage(void* imageBuf,
-                          const Rect& r, int stride=0) = 0;
-    virtual ~ImageGetter() {}
+#include <rdr/Exception.h>
+
+namespace rdr {
+
+  struct TLSException : public Exception {
+    int err;
+    TLSException(const char* s, int err_);
   };
+
 }
+
 #endif

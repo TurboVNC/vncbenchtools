@@ -17,8 +17,9 @@
  * USA.
  */
 
-#include "tiger-1.2/rdr/ZlibOutStream.h"
-#include "tiger-1.2/rdr/Exception.h"
+#include <rdr/ZlibOutStream.h>
+#include <rdr/Exception.h>
+#include <os/print.h>
 
 #include <zlib.h>
 

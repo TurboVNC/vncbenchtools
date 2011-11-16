@@ -19,10 +19,8 @@
 #ifndef __RFB_TIGHTDECODER_H__
 #define __RFB_TIGHTDECODER_H__
 
-#include "../rdr/ZlibInStream.h"
-#include "JpegDecompressor.h"
-#include "Rect.h"
-#include "PixelFormat.h"
+#include <rdr/ZlibInStream.h>
+#include <rfb/JpegDecompressor.h>
 
 namespace rfb {
 
