@@ -83,7 +83,14 @@ Bool rfbSendRectEncodingTight(rfbClientPtr _cl, int x, int y, int w, int h)
       if (!fb) fb = new FullFramePixelBuffer(spf, rfbScreen.width,
         rfbScreen.height, (rdr::U8 *)rfbScreen.pfbMemory, NULL);
       if (!cut) cut = new ComparingUpdateTracker(fb);
-      if (cut->compareRect(r)) te->writeRect(r, &image_getter, NULL);
+      rfb::Region changed;
+      cut->compareRect(r, &changed);
+      std::vector<Rect> rects;
+      std::vector<Rect>::const_iterator i;
+      if(changed.get_rects(&rects)) {
+        for (i = rects.begin(); i < rects.end(); i++)
+          te->writeRect(*i, &image_getter, NULL);
+      }
     }
     else te->writeRect(r, &image_getter, NULL);
   }

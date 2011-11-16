@@ -36,9 +36,8 @@ ComparingUpdateTracker::~ComparingUpdateTracker()
 
 #define BLOCK_SIZE 16
 
-bool ComparingUpdateTracker::compareRect(const Rect& r)
+void ComparingUpdateTracker::compareRect(const Rect& r, Region* newChanged)
 {
-
   if (firstCompare) {
     // NB: We leave the change region untouched on this iteration,
     // since in effect the entire framebuffer has changed.
@@ -57,8 +56,8 @@ bool ComparingUpdateTracker::compareRect(const Rect& r)
     // Crop the rect and try again
     safe = r.intersect(fb->getRect());
     if (!safe.is_empty())
-      return compareRect(safe);
-    return false;
+      compareRect(safe, newChanged);
+    return;
   }
 
   int bytesPerPixel = fb->getPF().bpp/8;
@@ -114,5 +113,9 @@ bool ComparingUpdateTracker::compareRect(const Rect& r)
     oldData += oldStrideBytes * BLOCK_SIZE;
   }
 
-  return !changedBlocks.empty();
+  if (!changedBlocks.empty()) {
+    Region temp;
+    temp.setOrderedRects(changedBlocks);
+    newChanged->assign_union(temp);
+  }
 }

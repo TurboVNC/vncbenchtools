@@ -7,6 +7,8 @@ set(SOURCES
   rfb/JpegDecompressor.cxx
   rfb/PixelBuffer.cxx
   rfb/PixelFormat.cxx
-  rfb/TightEncoder.cxx)
+  rfb/Region.cxx
+  rfb/TightEncoder.cxx
+  Xregion/Region.c)
 
 add_library(tigervnc ${SOURCES})

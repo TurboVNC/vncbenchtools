@@ -19,6 +19,7 @@
 #ifndef __RFB_COMPARINGUPDATETRACKER_H__
 #define __RFB_COMPARINGUPDATETRACKER_H__
 
+#include <rfb/Region.h>
 #include <rfb/PixelBuffer.h>
 
 namespace rfb {
@@ -27,7 +28,7 @@ namespace rfb {
   public:
     ComparingUpdateTracker(PixelBuffer* buffer);
     ~ComparingUpdateTracker();
-    bool compareRect(const Rect& r);
+    void compareRect(const Rect& r, Region* newchanged);
   private:
     PixelBuffer* fb;
     ManagedPixelBuffer oldFb;
