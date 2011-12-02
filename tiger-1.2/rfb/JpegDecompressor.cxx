@@ -199,10 +199,7 @@ void JpegDecompressor::decompress(const rdr::U8 *jpegBuf, int jpegBufLen,
 #endif
 
   if (dinfo->out_color_space == JCS_RGB) {
-    /* We put an extra 16 bytes here so valgrind won't freak out about
-       libjpeg-turbo doing unaligned memory accesses near the end of the
-       buffer */
-    dstBuf = new rdr::U8[w * h * pixelsize + 16];
+    dstBuf = new rdr::U8[w * h * pixelsize];
     dstBufIsTemp = true;
     dstBufPitch = w * pixelsize;
   }
