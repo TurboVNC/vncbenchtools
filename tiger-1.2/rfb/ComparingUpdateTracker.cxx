@@ -34,7 +34,7 @@ ComparingUpdateTracker::~ComparingUpdateTracker()
 }
 
 
-#define BLOCK_SIZE 16
+#define BLOCK_SIZE 64
 
 void ComparingUpdateTracker::compareRect(const Rect& r, Region* newChanged)
 {
