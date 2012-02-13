@@ -39,15 +39,15 @@ namespace rfb {
 
     void getImage(void* outPtr, const Rect& r, int outStride=0) {
       int inStride;
-      const rdr::U8* inPtr = getRawPixelsRW(r, &inStride);
+      const rdr::U8* inPtr = getRawPixelsR(r, &inStride);
       if (!outStride) outStride = r.width();
       translateRect((void*)inPtr, inStride, Rect(0, 0, r.width(), r.height()),
                     outPtr, outStride, Point(0, 0));
     }
 
-    rdr::U8 *getRawPixelsRW(const Rect &r, int *stride) {
+    const rdr::U8 *getRawPixelsR(const Rect &r, int *stride) {
       *stride = rfbScreen.paddedWidthInBytes / (rfbScreen.bitsPerPixel/8);
-      return (rdr::U8 *)(rfbScreen.pfbMemory
+      return (const rdr::U8 *)(rfbScreen.pfbMemory
         + (rfbScreen.paddedWidthInBytes * r.tl.y)
         + (r.tl.x * (rfbScreen.bitsPerPixel / 8)));
     }
@@ -70,7 +70,7 @@ namespace rfb {
         inRect.height());
     }
 
-    inline void translatePixels(void* inPtr, void* outPtr, int nPixels) {
+    inline void translatePixels(const void* inPtr, void* outPtr, int nPixels) {
       (*cl->translateFn)(cl->translateLookupTable, &rfbServerFormat,
         &cl->format, (char *)inPtr, (char *)outPtr, nPixels, nPixels, 1);
     }
