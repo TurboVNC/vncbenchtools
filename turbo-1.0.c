@@ -32,8 +32,10 @@
 #include <string.h>
 #include <pthread.h>
 #include <errno.h>
+#include <unistd.h>
 #include "rfb.h"
 #include "turbojpeg.h"
+
 
 #ifndef min
  #define min(a,b) ((a)<(b)?(a):(b))
@@ -41,6 +43,7 @@
 
 static int enableLastRectEncoding = 1;
 extern int decompress, ublen;
+
 
 /* Note: The following constant should not be changed. */
 #define TIGHT_MIN_TO_COMPRESS 12
@@ -88,6 +91,7 @@ static const int subsampLevel2tjsubsamp[TVNC_SAMPOPT] = {
     TJ_444, TJ_420, TJ_422, TJ_GRAYSCALE
 };
 
+
 /* Stuff dealing with palettes. */
 
 typedef struct COLOR_LIST_s {
@@ -106,6 +110,7 @@ typedef struct PALETTE_s {
     COLOR_LIST *hash[256];
     COLOR_LIST list[256];
 } PALETTE;
+
 
 /* Globals for multi-threading */
 
@@ -197,9 +202,11 @@ static void *TightThreadFunc(void *param);
 static Bool CheckUpdateBuf(threadparam *t, int bytes);
 static int nthreads(void);
 
+
 unsigned long solidrect = 0, solidpixels = 0, monorect = 0, monopixels = 0,
     ndxrect = 0, ndxpixels = 0, jpegrect = 0, jpegpixels = 0, fcrect = 0,
     fcpixels = 0, gradrect = 0, gradpixels = 0;
+
 
 /*
  * Tight encoding implementation.
@@ -230,6 +237,7 @@ rfbNumCodedRectsTight(cl, x, y, w, h)
         return 1;
     }
 }
+
 
 static int
 nthreads(void)
@@ -322,6 +330,7 @@ TightThreadFunc(param)
     return NULL;
 }
 
+
 static Bool
 CheckUpdateBuf(t, bytes)
     threadparam *t;
@@ -342,6 +351,7 @@ CheckUpdateBuf(t, bytes)
     }
     return TRUE;
 }
+
 
 Bool
 rfbSendRectEncodingTight(cl, x, y, w, h)
@@ -438,6 +448,7 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
 
     return status;
 }
+
 
 static Bool
 SendRectEncodingTight(t, x, y, w, h)
@@ -578,6 +589,7 @@ SendRectEncodingTight(t, x, y, w, h)
     return SendRectSimple(t, x, y, w, h);
 }
 
+
 static void
 FindBestSolidArea(x, y, w, h, colorValue, w_ptr, h_ptr)
     int x, y, w, h;
@@ -619,6 +631,7 @@ FindBestSolidArea(x, y, w, h, colorValue, w_ptr, h_ptr)
     *h_ptr = h_best;
 }
 
+
 static void
 ExtendSolidArea(x, y, w, h, colorValue, x_ptr, y_ptr, w_ptr, h_ptr)
     int x, y, w, h;
@@ -656,6 +669,7 @@ ExtendSolidArea(x, y, w, h, colorValue, x_ptr, y_ptr, w_ptr, h_ptr)
     *w_ptr += cx - (*x_ptr + *w_ptr);
 }
 
+
 /*
  * Check if a rectangle is all of the same color. If needSameColor is
  * set to non-zero, then also check that its color equals to the
@@ -678,6 +692,7 @@ CheckSolidTile(x, y, w, h, colorPtr, needSameColor)
         return CheckSolidTile8(x, y, w, h, colorPtr, needSameColor);
     }
 }
+
 
 #define DEFINE_CHECK_SOLID_FUNCTION(bpp)                                      \
                                                                               \
@@ -713,6 +728,7 @@ CheckSolidTile##bpp(x, y, w, h, colorPtr, needSameColor)                      \
 DEFINE_CHECK_SOLID_FUNCTION(8)
 DEFINE_CHECK_SOLID_FUNCTION(16)
 DEFINE_CHECK_SOLID_FUNCTION(32)
+
 
 static Bool
 SendRectSimple(t, x, y, w, h)
@@ -770,6 +786,7 @@ SendRectSimple(t, x, y, w, h)
     return TRUE;
 }
 
+
 static Bool
 SendSubrect(t, x, y, w, h)
     threadparam *t;
@@ -791,7 +808,7 @@ SendSubrect(t, x, y, w, h)
         return FALSE;
 
     fbptr = (rfbScreen.pfbMemory + (rfbScreen.paddedWidthInBytes * y)
-          + (x * (rfbScreen.bitsPerPixel / 8)));
+             + (x * (rfbScreen.bitsPerPixel / 8)));
 
     if (subsampLevel == TJ_GRAYSCALE && qualityLevel != -1)
         return SendJpegRect(t, x, y, w, h, qualityLevel);
@@ -870,6 +887,7 @@ SendSubrect(t, x, y, w, h)
     return success;
 }
 
+
 static Bool
 SendTightHeader(t, x, y, w, h)
     threadparam *t;
@@ -895,6 +913,7 @@ SendTightHeader(t, x, y, w, h)
 
     return TRUE;
 }
+
 
 /*
  * Subencoding implementations.
@@ -924,6 +943,7 @@ SendSolidRect(t)
 
     return TRUE;
 }
+
 
 static Bool
 SendMonoRect(t, w, h)
@@ -1000,6 +1020,7 @@ SendMonoRect(t, w, h)
                         tightConf[compressLevel].monoZlibLevel,
                         Z_DEFAULT_STRATEGY);
 }
+
 
 static Bool
 SendIndexedRect(t, w, h)
