@@ -5,7 +5,7 @@
  */
 
 /*
- *  Copyright (C) 2010 D. R. Commander.  All Rights Reserved.
+ *  Copyright (C) 2010-2012 D. R. Commander.  All Rights Reserved.
  *  Copyright (C) 2005-2008 Sun Microsystems, Inc.  All Rights Reserved.
  *  Copyright (C) 2004 Landmark Graphics Corporation.  All Rights Reserved.
  *  Copyright (C) 2000, 2001 Const Kaplinsky.  All Rights Reserved.
@@ -84,7 +84,7 @@ static int compressLevel = 1;
 static int qualityLevel = 95;
 static int subsampLevel = 0;
 
-static const int subsampLevel2tjsubsamp[4] = {
+static const int subsampLevel2tjsubsamp[TVNC_SAMPOPT] = {
     TJ_444, TJ_420, TJ_422, TJ_GRAYSCALE
 };
 
@@ -197,9 +197,9 @@ static void *TightThreadFunc(void *param);
 static Bool CheckUpdateBuf(threadparam *t, int bytes);
 static int nthreads(void);
 
-unsigned long solidrect=0, solidpixels=0, monorect=0, monopixels=0, ndxrect=0,
-	ndxpixels=0, jpegrect=0, jpegpixels=0, fcrect=0, fcpixels=0, gradrect=0,
-	gradpixels=0;
+unsigned long solidrect = 0, solidpixels = 0, monorect = 0, monopixels = 0,
+    ndxrect = 0, ndxpixels = 0, jpegrect = 0, jpegpixels = 0, fcrect = 0,
+    fcpixels = 0, gradrect = 0, gradpixels = 0;
 
 /*
  * Tight encoding implementation.
@@ -216,7 +216,7 @@ rfbNumCodedRectsTight(cl, x, y, w, h)
     /* No matter how many rectangles we will send if LastRect markers
        are used to terminate rectangle stream. */
     if (enableLastRectEncoding && w * h >= MIN_SPLIT_RECT_SIZE)
-      return 0;
+        return 0;
 
     maxRectSize = tightConf[compressLevel].maxRectSize;
     maxRectWidth = tightConf[compressLevel].maxRectWidth;
@@ -253,7 +253,7 @@ InitThreads(void)
     if (threadInit) return;
 
     _nt = nthreads();
-    memset(tparam, 0, sizeof(threadparam)*TVNC_MAXTHREADS);
+    memset(tparam, 0, sizeof(threadparam) * TVNC_MAXTHREADS);
     tparam[0].ublen = &ublen;
     tparam[0].updateBuf = updateBuf;
     for (i = 1; i < TVNC_MAXTHREADS; i++) {
@@ -261,7 +261,7 @@ InitThreads(void)
         tparam[i].id = i;
     }
     rfbLog("Using %d thread%s for Tight encoding\n", _nt,
-        _nt == 1 ? "" : "s");
+           _nt == 1 ? "" : "s");
     if (_nt > 1) {
         for (i = 1; i < _nt; i++) {
             if (!tparam[i].updateBuf) {
@@ -273,7 +273,7 @@ InitThreads(void)
             pthread_mutex_init(&tparam[i].done, NULL);
             pthread_mutex_lock(&tparam[i].done);
             if ((err = pthread_create(&thnd[i], NULL, TightThreadFunc,
-                &tparam[i])) != 0) {
+                                      &tparam[i])) != 0) {
                 rfbLog ("Could not start thread %d: %s\n", i + 1,
                     strerror(err == -1 ? errno : err));
                 return;
@@ -286,33 +286,33 @@ InitThreads(void)
 void
 ShutdownTightThreads(void)
 {
-  int i;
-  if (_nt > 1) {
-    for (i = 1; i < _nt; i++) {
-      if(thnd[i]) {
-        tparam[i].deadyet = TRUE;
-        pthread_mutex_unlock(&tparam[i].ready);
-        pthread_join(thnd[i], NULL);
-        thnd[i] = 0;
-        pthread_mutex_destroy(&tparam[i].ready);
-        pthread_mutex_destroy(&tparam[i].done);
-      }
+    int i;
+    if (_nt > 1) {
+        for (i = 1; i < _nt; i++) {
+            if(thnd[i]) {
+                tparam[i].deadyet = TRUE;
+                pthread_mutex_unlock(&tparam[i].ready);
+                pthread_join(thnd[i], NULL);
+                thnd[i] = 0;
+                pthread_mutex_destroy(&tparam[i].ready);
+                pthread_mutex_destroy(&tparam[i].done);
+            }
+        }
     }
-  }
-  for (i = 0; i < _nt; i++) {
-    if (tparam[i].tightAfterBuf) free(tparam[i].tightAfterBuf);
-    if (tparam[i].tightBeforeBuf) free(tparam[i].tightBeforeBuf);
-    if (i != 0 && tparam[i].updateBuf) free(tparam[i].updateBuf);
-    memset(&tparam[i], 0, sizeof(threadparam));
-  }
-  threadInit = FALSE;
+    for (i = 0; i < _nt; i++) {
+        if (tparam[i].tightAfterBuf) free(tparam[i].tightAfterBuf);
+        if (tparam[i].tightBeforeBuf) free(tparam[i].tightBeforeBuf);
+        if (i != 0 && tparam[i].updateBuf) free(tparam[i].updateBuf);
+        memset(&tparam[i], 0, sizeof(threadparam));
+    }
+    threadInit = FALSE;
 }
 
 static void *
 TightThreadFunc(param)
     void *param;
 {
-    threadparam *t=(threadparam *)param;
+    threadparam *t = (threadparam *)param;
     while (!t->deadyet) {
         pthread_mutex_lock(&t->ready);
         if (t->deadyet) break;
@@ -337,8 +337,7 @@ CheckUpdateBuf(t, bytes)
     else {
         if ((*t->ublen) + bytes > t->updateBufSize) {
             t->updateBufSize += UPDATE_BUF_SIZE;
-            t->updateBuf = (char *)xrealloc(t->updateBuf,
-                                            t->updateBufSize);
+            t->updateBuf = (char *)xrealloc(t->updateBuf, t->updateBufSize);
         }
     }
     return TRUE;
@@ -353,8 +352,8 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
     int i, nt;
 
     if (!threadInit) {
-      InitThreads();
-      if (!threadInit) return FALSE;
+        InitThreads();
+        if (!threadInit) return FALSE;
     }
 
     if (qualityLevel != -1) compressLevel = 1;
@@ -384,18 +383,18 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
             else tparam[i].nStreams = 4 / n;
             tparam[i].streamId = tparam[i].baseStreamId;
         }
-        tparam[i].solidrect=tparam[i].solidpixels=0;
-        tparam[i].monorect=tparam[i].monopixels=0;
-        tparam[i].ndxrect=tparam[i].ndxpixels=0;
-        tparam[i].jpegrect=tparam[i].jpegpixels=0;
-        tparam[i].fcrect=tparam[i].fcpixels=0;
+        tparam[i].solidrect = tparam[i].solidpixels = 0;
+        tparam[i].monorect = tparam[i].monopixels = 0;
+        tparam[i].ndxrect = tparam[i].ndxpixels = 0;
+        tparam[i].jpegrect = tparam[i].jpegpixels = 0;
+        tparam[i].fcrect = tparam[i].fcpixels = 0;
     }
     if (nt > 1) {
         for (i = 1; i < nt; i++) pthread_mutex_unlock(&tparam[i].ready);
     }
 
     status &= SendRectEncodingTight(&tparam[0], tparam[0].x, tparam[0].y,
-        tparam[0].w, tparam[0].h);
+                                    tparam[0].w, tparam[0].h);
     cl->rfbBytesSent[rfbEncodingTight] += tparam[0].bytessent;
     cl->rfbRectanglesSent[rfbEncodingTight] += tparam[0].rectsent;
 
@@ -425,16 +424,16 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
         }
     }
     for (i = 0; i < nt; i++) {
-        solidrect+=tparam[i].solidrect;
-        solidpixels+=tparam[i].solidpixels;
-        monorect+=tparam[i].monorect;
-        monopixels+=tparam[i].monopixels;
-        ndxrect+=tparam[i].ndxrect;
-        ndxpixels+=tparam[i].ndxpixels;
-        jpegrect+=tparam[i].jpegrect;
-        jpegpixels+=tparam[i].jpegpixels;
-        fcrect+=tparam[i].fcrect;
-        fcpixels+=tparam[i].fcpixels;
+        solidrect += tparam[i].solidrect;
+        solidpixels += tparam[i].solidpixels;
+        monorect += tparam[i].monorect;
+        monopixels += tparam[i].monopixels;
+        ndxrect += tparam[i].ndxrect;
+        ndxpixels += tparam[i].ndxpixels;
+        jpegrect += tparam[i].jpegrect;
+        jpegpixels += tparam[i].jpegpixels;
+        fcrect += tparam[i].fcrect;
+        fcpixels += tparam[i].fcpixels;
     }
 
     return status;
@@ -463,7 +462,7 @@ SendRectEncodingTight(t, x, y, w, h)
             t->tightBeforeBuf = (char *)xalloc(t->tightBeforeBufSize);
         else
             t->tightBeforeBuf = (char *)xrealloc(t->tightBeforeBuf,
-                                              t->tightBeforeBufSize);
+                                                 t->tightBeforeBufSize);
     }
 
     /* Calculate maximum number of rows in one non-solid rectangle. */
@@ -491,28 +490,28 @@ SendRectEncodingTight(t, x, y, w, h)
         }
 
         dh = (dy + MAX_SPLIT_TILE_SIZE <= y + h) ?
-            MAX_SPLIT_TILE_SIZE : (y + h - dy);
+             MAX_SPLIT_TILE_SIZE : (y + h - dy);
 
         for (dx = x; dx < x + w; dx += MAX_SPLIT_TILE_SIZE) {
 
             dw = (dx + MAX_SPLIT_TILE_SIZE <= x + w) ?
-                MAX_SPLIT_TILE_SIZE : (x + w - dx);
+                 MAX_SPLIT_TILE_SIZE : (x + w - dx);
 
             if (CheckSolidTile(dx, dy, dw, dh, &colorValue, FALSE)) {
 
                 if (subsampLevel == TJ_GRAYSCALE && qualityLevel != -1) {
-		    CARD32 r=(colorValue>>16)&0xFF;
-		    CARD32 g=(colorValue>>8)&0xFF;
-		    CARD32 b=(colorValue)&0xFF;
-		    double y=(0.257*(double)r)+(0.504*(double)g)
-		        +(0.098*(double)b)+16.;
-		    colorValue=(int)y+(((int)y)<<8)+(((int)y)<<16);
-		}
+                    CARD32 r = (colorValue >> 16) & 0xFF;
+                    CARD32 g = (colorValue >> 8) & 0xFF;
+                    CARD32 b = (colorValue) & 0xFF;
+                    double y = (0.257 * (double)r) + (0.504 * (double)g)
+                             + (0.098 * (double)b) + 16.;
+                    colorValue = (int)y + (((int)y) << 8) + (((int)y) << 16);
+                }
 
                 /* Get dimensions of solid-color area. */
 
                 FindBestSolidArea(dx, dy, w - (dx - x), h - (dy - y),
-				  colorValue, &w_best, &h_best);
+                                  colorValue, &w_best, &h_best);
 
                 /* Make sure a solid rectangle is large enough
                    (or the whole rectangle is of the same color). */
@@ -534,7 +533,7 @@ SendRectEncodingTight(t, x, y, w, h)
                     return FALSE;
                 if ( x_best != x &&
                      !SendRectEncodingTight(t, x, y_best,
-                                               x_best-x, h_best) )
+                                            x_best-x, h_best) )
                     return FALSE;
 
                 /* Send solid-color rectangle. */
@@ -550,19 +549,19 @@ SendRectEncodingTight(t, x, y, w, h)
                                    &cl->format, fbptr, t->tightBeforeBuf,
                                    rfbScreen.paddedWidthInBytes, 1, 1);
 
-                t->solidrect++;  t->solidpixels+=w_best*h_best;
+                t->solidrect++;  t->solidpixels += w_best * h_best;
                 if (!SendSolidRect(t))
                     return FALSE;
 
                 /* Send remaining rectangles (at right and bottom). */
 
                 if ( x_best + w_best != x + w &&
-                     !SendRectEncodingTight(t, x_best+w_best, y_best,
-                                               w-(x_best-x)-w_best, h_best) )
+                     !SendRectEncodingTight(t, x_best + w_best, y_best,
+                                            w - (x_best-x) - w_best, h_best) )
                     return FALSE;
                 if ( y_best + h_best != y + h &&
-                     !SendRectEncodingTight(t, x, y_best+h_best,
-                                               w, h-(y_best-y)-h_best) )
+                     !SendRectEncodingTight(t, x, y_best + h_best,
+                                            w, h - (y_best-y) - h_best) )
                     return FALSE;
 
                 /* Return after all recursive calls are done. */
@@ -594,19 +593,19 @@ FindBestSolidArea(x, y, w, h, colorValue, w_ptr, h_ptr)
     for (dy = y; dy < y + h; dy += MAX_SPLIT_TILE_SIZE) {
 
         dh = (dy + MAX_SPLIT_TILE_SIZE <= y + h) ?
-            MAX_SPLIT_TILE_SIZE : (y + h - dy);
+             MAX_SPLIT_TILE_SIZE : (y + h - dy);
         dw = (w_prev > MAX_SPLIT_TILE_SIZE) ?
-            MAX_SPLIT_TILE_SIZE : w_prev;
+             MAX_SPLIT_TILE_SIZE : w_prev;
 
         if (!CheckSolidTile(x, dy, dw, dh, &colorValue, TRUE))
             break;
 
         for (dx = x + dw; dx < x + w_prev;) {
             dw = (dx + MAX_SPLIT_TILE_SIZE <= x + w_prev) ?
-                MAX_SPLIT_TILE_SIZE : (x + w_prev - dx);
+                 MAX_SPLIT_TILE_SIZE : (x + w_prev - dx);
             if (!CheckSolidTile(dx, dy, dw, dh, &colorValue, TRUE))
                 break;
-	    dx += dw;
+            dx += dw;
         }
 
         w_prev = dx - x;
@@ -739,7 +738,7 @@ SendRectSimple(t, x, y, w, h)
             t->tightBeforeBuf = (char *)xalloc(t->tightBeforeBufSize);
         else
             t->tightBeforeBuf = (char *)xrealloc(t->tightBeforeBuf,
-                                              t->tightBeforeBufSize);
+                                                 t->tightBeforeBufSize);
     }
 
     if (t->tightAfterBufSize < maxAfterSize) {
@@ -748,7 +747,7 @@ SendRectSimple(t, x, y, w, h)
             t->tightAfterBuf = (char *)xalloc(t->tightAfterBufSize);
         else
             t->tightAfterBuf = (char *)xrealloc(t->tightAfterBuf,
-                                             t->tightAfterBufSize);
+                                                t->tightAfterBufSize);
     }
 
     if (w > maxRectWidth || w * h > maxRectSize) {
@@ -759,7 +758,7 @@ SendRectSimple(t, x, y, w, h)
             for (dx = 0; dx < w; dx += maxRectWidth) {
                 rw = (dx + maxRectWidth < w) ? maxRectWidth : w - dx;
                 rh = (dy + subrectMaxHeight < h) ? subrectMaxHeight : h - dy;
-                if (!SendSubrect(t, x+dx, y+dy, rw, rh))
+                if (!SendSubrect(t, x + dx, y + dy, rw, rh))
                     return FALSE;
             }
         }
@@ -792,7 +791,7 @@ SendSubrect(t, x, y, w, h)
         return FALSE;
 
     fbptr = (rfbScreen.pfbMemory + (rfbScreen.paddedWidthInBytes * y)
-             + (x * (rfbScreen.bitsPerPixel / 8)));
+          + (x * (rfbScreen.bitsPerPixel / 8)));
 
     if (subsampLevel == TJ_GRAYSCALE && qualityLevel != -1)
         return SendJpegRect(t, x, y, w, h, qualityLevel);
@@ -857,7 +856,7 @@ SendSubrect(t, x, y, w, h)
         break;
     case 1:
         /* Solid rectangle */
-        solidrect++;  solidpixels+=w*h;
+        solidrect++;  solidpixels += w*h;
         success = SendSolidRect(t);
         break;
     case 2:
@@ -918,7 +917,7 @@ SendSolidRect(t)
         return FALSE;
 
     t->updateBuf[(*t->ublen)++] = (char)(rfbTightFill << 4);
-    memcpy (&t->updateBuf[*t->ublen], t->tightBeforeBuf, len);
+    memcpy(&t->updateBuf[*t->ublen], t->tightBeforeBuf, len);
     (*t->ublen) += len;
 
     t->bytessent += len + 1;
@@ -935,10 +934,10 @@ SendMonoRect(t, w, h)
     int paletteLen, dataLen;
     rfbClientPtr cl = t->cl;
 
-    t->monorect++;  t->monopixels+=w*h;
+    t->monorect++;  t->monopixels += w*h;
 
     if (!CheckUpdateBuf(t, TIGHT_MIN_TO_COMPRESS + 6 +
-          2 * cl->format.bitsPerPixel / 8))
+                        2 * cl->format.bitsPerPixel / 8))
         return FALSE;
 
     if(t->nStreams > 0) {
@@ -952,7 +951,8 @@ SendMonoRect(t, w, h)
     dataLen *= h;
 
     if (tightConf[compressLevel].monoZlibLevel == 0 || t->id > 3)
-        t->updateBuf[(*t->ublen)++] = (char)((rfbTightNoZlib | rfbTightExplicitFilter) << 4);
+        t->updateBuf[(*t->ublen)++] =
+            (char)((rfbTightNoZlib | rfbTightExplicitFilter) << 4);
     else
         t->updateBuf[(*t->ublen)++] = (streamId | rfbTightExplicitFilter) << 4;
     t->updateBuf[(*t->ublen)++] = rfbTightFilterPalette;
@@ -1010,11 +1010,11 @@ SendIndexedRect(t, w, h)
     int i, entryLen;
     rfbClientPtr cl = t->cl;
 
-    t->ndxrect++;  t->ndxpixels+=w*h;
+    t->ndxrect++;  t->ndxpixels += w*h;
 
-    if (!CheckUpdateBuf(t, TIGHT_MIN_TO_COMPRESS + 6 +
-          t->paletteNumColors * cl->format.bitsPerPixel / 8))
-            return FALSE;
+    if( !CheckUpdateBuf(t, TIGHT_MIN_TO_COMPRESS + 6 +
+        t->paletteNumColors * cl->format.bitsPerPixel / 8))
+        return FALSE;
 
     if(t->nStreams > 0) {
         t->streamId++;
@@ -1024,7 +1024,8 @@ SendIndexedRect(t, w, h)
 
     /* Prepare tight encoding header. */
     if (tightConf[compressLevel].idxZlibLevel == 0 || t->id > 3)
-        t->updateBuf[(*t->ublen)++] = (char)((rfbTightNoZlib | rfbTightExplicitFilter) << 4);
+        t->updateBuf[(*t->ublen)++] =
+            (char)((rfbTightNoZlib | rfbTightExplicitFilter) << 4);
     else
         t->updateBuf[(*t->ublen)++] = (streamId | rfbTightExplicitFilter) << 4;
     t->updateBuf[(*t->ublen)++] = rfbTightFilterPalette;
@@ -1046,7 +1047,8 @@ SendIndexedRect(t, w, h)
         } else
             entryLen = 4;
 
-        memcpy(&t->updateBuf[*t->ublen], t->tightAfterBuf, t->paletteNumColors * entryLen);
+        memcpy(&t->updateBuf[*t->ublen], t->tightAfterBuf,
+               t->paletteNumColors * entryLen);
         (*t->ublen) += t->paletteNumColors * entryLen;
         t->bytessent += 3 + t->paletteNumColors * entryLen;
         break;
@@ -1059,7 +1061,8 @@ SendIndexedRect(t, w, h)
                 (CARD16)t->palette.entry[i].listNode->rgb;
         }
 
-        memcpy(&t->updateBuf[*t->ublen], t->tightAfterBuf, t->paletteNumColors * 2);
+        memcpy(&t->updateBuf[*t->ublen], t->tightAfterBuf,
+               t->paletteNumColors * 2);
         (*t->ublen) += t->paletteNumColors * 2;
         t->bytessent += 3 + t->paletteNumColors * 2;
         break;
@@ -1073,6 +1076,7 @@ SendIndexedRect(t, w, h)
                         Z_DEFAULT_STRATEGY);
 }
 
+
 static Bool
 SendFullColorRect(t, w, h)
     threadparam *t;
@@ -1082,7 +1086,7 @@ SendFullColorRect(t, w, h)
     int len;
     rfbClientPtr cl = t->cl;
 
-    t->fcrect++;  t->fcpixels+=w*h;
+    t->fcrect++;  t->fcpixels += w*h;
 
     if (!CheckUpdateBuf(t, TIGHT_MIN_TO_COMPRESS + 1))
         return FALSE;
@@ -1109,6 +1113,7 @@ SendFullColorRect(t, w, h)
                         tightConf[compressLevel].rawZlibLevel,
                         Z_DEFAULT_STRATEGY);
 }
+
 
 static Bool
 CompressData(t, streamId, dataLen, zlibLevel, zlibStrategy)
@@ -1166,14 +1171,15 @@ CompressData(t, streamId, dataLen, zlibLevel, zlibStrategy)
     }
 
     /* Actual compression. */
-    if ( deflate (pz, Z_SYNC_FLUSH) != Z_OK ||
-         pz->avail_in != 0 || pz->avail_out == 0 ) {
+    if (deflate(pz, Z_SYNC_FLUSH) != Z_OK ||
+        pz->avail_in != 0 || pz->avail_out == 0) {
         return FALSE;
     }
 
     return SendCompressedData(t, t->tightAfterBuf,
-        t->tightAfterBufSize - pz->avail_out);
+                              t->tightAfterBufSize - pz->avail_out);
 }
+
 
 static Bool SendCompressedData(t, buf, compressedLen)
     threadparam *t;
@@ -1208,6 +1214,7 @@ static Bool SendCompressedData(t, buf, compressedLen)
     t->bytessent += compressedLen;
     return TRUE;
 }
+
 
 /*
  * Code to determine how many different colors used in rectangle.
@@ -1256,6 +1263,7 @@ FillPalette8(t, count)
         t->paletteNumColors = 2;   /* Two colors */
     }
 }
+
 
 #define DEFINE_FILL_PALETTE_FUNCTION(bpp)                               \
                                                                         \
@@ -1324,6 +1332,7 @@ FillPalette##bpp(t, count)                                              \
 
 DEFINE_FILL_PALETTE_FUNCTION(16)
 DEFINE_FILL_PALETTE_FUNCTION(32)
+
 
 #define DEFINE_FAST_FILL_PALETTE_FUNCTION(bpp)                          \
                                                                         \
@@ -1436,6 +1445,7 @@ DEFINE_FAST_FILL_PALETTE_FUNCTION(32)
 #define HASH_FUNC16(rgb) ((int)((((rgb) >> 8) + (rgb)) & 0xFF))
 #define HASH_FUNC32(rgb) ((int)((((rgb) >> 16) + ((rgb) >> 8)) & 0xFF))
 
+
 static void
 PaletteReset(t)
     threadparam *t;
@@ -1443,6 +1453,7 @@ PaletteReset(t)
     t->paletteNumColors = 0;
     memset(t->palette.hash, 0, 256 * sizeof(COLOR_LIST *));
 }
+
 
 static int
 PaletteInsert(t, rgb, numPixels, bpp)
@@ -1470,7 +1481,8 @@ PaletteInsert(t, rgb, numPixels, bpp)
                     t->palette.entry[new_idx].listNode->idx = new_idx;
                     new_idx--;
                 }
-                while (new_idx && t->palette.entry[new_idx-1].numPixels < count);
+                while (new_idx &&
+                       t->palette.entry[new_idx-1].numPixels < count);
                 t->palette.entry[new_idx].listNode = pnode;
                 pnode->idx = new_idx;
             }
@@ -1482,7 +1494,8 @@ PaletteInsert(t, rgb, numPixels, bpp)
     }
 
     /* Check if palette is full. */
-    if (t->paletteNumColors == 256 || t->paletteNumColors == t->paletteMaxColors) {
+    if (t->paletteNumColors == 256 ||
+        t->paletteNumColors == t->paletteMaxColors) {
         t->paletteNumColors = 0;
         return 0;
     }
@@ -1590,6 +1603,7 @@ EncodeIndexedRect##bpp(t, buf, count)                                   \
 DEFINE_IDX_ENCODE_FUNCTION(16)
 DEFINE_IDX_ENCODE_FUNCTION(32)
 
+
 #define DEFINE_MONO_ENCODE_FUNCTION(bpp)                                \
                                                                         \
 static void                                                             \
@@ -1648,6 +1662,7 @@ DEFINE_MONO_ENCODE_FUNCTION(8)
 DEFINE_MONO_ENCODE_FUNCTION(16)
 DEFINE_MONO_ENCODE_FUNCTION(32)
 
+
 /*
  * JPEG compression stuff.
  */
@@ -1659,39 +1674,39 @@ SendJpegRect(t, x, y, w, h, quality)
     int quality;
 {
     unsigned char *srcbuf;
-    int ps=rfbServerFormat.bitsPerPixel/8;
-    int subsamp=subsampLevel2tjsubsamp[subsampLevel];
-    unsigned long size=0;
-    int flags=0, pitch;
-    unsigned char *tmpbuf=NULL;
+    int ps = rfbServerFormat.bitsPerPixel / 8;
+    int subsamp = subsampLevel2tjsubsamp[subsampLevel];
+    unsigned long size = 0;
+    int flags = 0, pitch;
+    unsigned char *tmpbuf = NULL;
     unsigned long jpegDstDataLen;
 
     if (rfbServerFormat.bitsPerPixel == 8)
         return SendFullColorRect(t, w, h);
 
-    t->jpegrect++;  t->jpegpixels+=w*h;
+    t->jpegrect++;  t->jpegpixels += w * h;
 
-    if(ps<2) {
+    if(ps < 2) {
       rfbLog("Error: JPEG requires 16-bit, 24-bit, or 32-bit pixel format.\n");
       return 0;
     }
     if(!t->j) {
-      if((t->j=tjInitCompress())==NULL) {
+      if((t->j = tjInitCompress()) == NULL) {
         rfbLog("JPEG Error: %s\n", tjGetErrorStr());  return 0;
       }
     }
 
-    if (t->tightAfterBufSize < TJBUFSIZE(w,h)) {
+    if (t->tightAfterBufSize < TJBUFSIZE(w, h)) {
         if (t->tightAfterBuf == NULL)
-            t->tightAfterBuf = (char *)xalloc(TJBUFSIZE(w,h));
+            t->tightAfterBuf = (char *)xalloc(TJBUFSIZE(w, h));
         else
             t->tightAfterBuf = (char *)xrealloc(t->tightAfterBuf,
-                                             TJBUFSIZE(w,h));
+                                                TJBUFSIZE(w, h));
         if(!t->tightAfterBuf) {
             rfbLog("Memory allocation failure!\n");
             return 0;
         }
-        t->tightAfterBufSize = TJBUFSIZE(w,h);
+        t->tightAfterBufSize = TJBUFSIZE(w, h);
     }
 
     if (ps == 2) {
@@ -1699,55 +1714,58 @@ SendJpegRect(t, x, y, w, h, quality)
         unsigned char *dst;
         int inRed, inGreen, inBlue, i, j;
 
-        if((tmpbuf=(unsigned char *)malloc(w*h*3))==NULL)
+        if((tmpbuf = (unsigned char *)malloc(w * h * 3)) == NULL)
             rfbLog("Memory allocation failure!\n");
         srcptr = (CARD16 *)
-            &rfbScreen.pfbMemory[y * rfbScreen.paddedWidthInBytes +
-                                 x * ps];
+            &rfbScreen.pfbMemory[y * rfbScreen.paddedWidthInBytes + x * ps];
         dst = tmpbuf;
-        for(j=0; j<h; j++) {
-            CARD16 *srcptr2=srcptr;
-            unsigned char *dst2=dst;
-            for(i=0; i<w; i++) {
+        for(j = 0; j < h; j++) {
+            CARD16 *srcptr2 = srcptr;
+            unsigned char *dst2 = dst;
+            for(i = 0; i < w; i++) {
                 pix = *srcptr2++;
-                inRed = (int)
-                    (pix >> rfbServerFormat.redShift   & rfbServerFormat.redMax);
-                inGreen = (int)
-                    (pix >> rfbServerFormat.greenShift & rfbServerFormat.greenMax);
-                inBlue  = (int)
-                    (pix >> rfbServerFormat.blueShift  & rfbServerFormat.blueMax);
-                *dst2++ = (CARD8)((inRed   * 255 + rfbServerFormat.redMax / 2) /
-                          rfbServerFormat.redMax);                          
-               	*dst2++ = (CARD8)((inGreen * 255 + rfbServerFormat.greenMax / 2) /
-                          rfbServerFormat.greenMax);
-                *dst2++ = (CARD8)((inBlue  * 255 + rfbServerFormat.blueMax / 2) /
-                          rfbServerFormat.blueMax);
+                inRed = (int)(pix >> rfbServerFormat.redShift
+                              & rfbServerFormat.redMax);
+                inGreen = (int)(pix >> rfbServerFormat.greenShift
+                                & rfbServerFormat.greenMax);
+                inBlue  = (int)(pix >> rfbServerFormat.blueShift
+                                & rfbServerFormat.blueMax);
+                *dst2++ = (CARD8)
+                    ((inRed * 255 + rfbServerFormat.redMax / 2)
+                     / rfbServerFormat.redMax);                          
+                *dst2++ = (CARD8)
+                    ((inGreen * 255 + rfbServerFormat.greenMax / 2)
+                     / rfbServerFormat.greenMax);
+                *dst2++ = (CARD8)
+                    ((inBlue  * 255 + rfbServerFormat.blueMax / 2)
+                     / rfbServerFormat.blueMax);
             }
-            srcptr+=rfbScreen.paddedWidthInBytes/ps;
-            dst+=w*3;
+            srcptr += rfbScreen.paddedWidthInBytes / ps;
+            dst += w * 3;
         }
         srcbuf = tmpbuf;
-        pitch = w*3;
+        pitch = w * 3;
         ps = 3;
     } else {
-        if(rfbServerFormat.bigEndian && ps==4) flags|=TJ_ALPHAFIRST;
-        if(rfbServerFormat.redShift==16 && rfbServerFormat.blueShift==0)
-            flags|=TJ_BGR;
-        if(rfbServerFormat.bigEndian) flags^=TJ_BGR;
-        srcbuf=(unsigned char *)&rfbScreen.pfbMemory[y * 
-            rfbScreen.paddedWidthInBytes + x * ps];
-        pitch=rfbScreen.paddedWidthInBytes;
+        if(rfbServerFormat.bigEndian && ps == 4) flags |= TJ_ALPHAFIRST;
+        if(rfbServerFormat.redShift == 16 && rfbServerFormat.blueShift == 0)
+            flags |= TJ_BGR;
+        if(rfbServerFormat.bigEndian) flags ^= TJ_BGR;
+        srcbuf = (unsigned char *)
+            &rfbScreen.pfbMemory[y * rfbScreen.paddedWidthInBytes + x * ps];
+        pitch = rfbScreen.paddedWidthInBytes;
     }
 
     if(tjCompress(t->j, srcbuf, w, pitch, h, ps,
-      (unsigned char *)t->tightAfterBuf, &size, subsamp, quality, flags)==-1) {
+                  (unsigned char *)t->tightAfterBuf, &size, subsamp, quality,
+                  flags) == -1) {
       rfbLog("JPEG Error: %s\n", tjGetErrorStr());
-      if(tmpbuf) {free(tmpbuf);  tmpbuf=NULL;}
+      if(tmpbuf) { free(tmpbuf);  tmpbuf = NULL; }
       return 0;
     }
-    jpegDstDataLen=(int)size;
+    jpegDstDataLen = (int)size;
 
-    if(tmpbuf) {free(tmpbuf);  tmpbuf=NULL;}
+    if(tmpbuf) { free(tmpbuf);  tmpbuf = NULL; }
 
     if (!CheckUpdateBuf(t, TIGHT_MIN_TO_COMPRESS + 1))
         return FALSE;
