@@ -6,7 +6,7 @@ include(CheckCSourceRuns)
 project(vncbenchtools)
 
 set(ENCODER_OPTIONS
-  "tight-1.1, tight-1.3.9, turbo-0.4, turbo-0.5, turbo-1.0, tiger-1.1, tiger-1.2")
+  "tight-1.1, tight-1.3.9, turbo-0.4, turbo-0.5, turbo-1.0, turbo-1.1, tiger-1.1, tiger-1.2")
 
 set(ENCODER "" CACHE STRING
   "Which Tight/Turbo/Tiger encoder to use (one of ${ENCODER_OPTIONS})")
