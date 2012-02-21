@@ -82,6 +82,10 @@ if(ENCODER MATCHES turbo-* OR DECODER MATCHES turbo-*)
   set(LINK_LIBRARIES ${LINK_LIBRARIES} ${TJPEG_LIBRARY})
 endif()
 
+if(ENCODER MATCHES turbo-1.* OR DECODER MATCHES turbo-1.*)
+  set(LINK_LIBRARIES ${LINK_LIBRARIES} pthread)
+endif()
+
 if(ENCODER MATCHES tiger-*)
   file(REMOVE tiger.cxx)
   add_custom_command(OUTPUT tiger.cxx
