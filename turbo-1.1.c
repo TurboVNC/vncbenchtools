@@ -876,7 +876,7 @@ SendSubrect(t, x, y, w, h)
         break;
     case 1:
         /* Solid rectangle */
-        solidrect++;  solidpixels += w*h;
+        t->solidrect++;  t->solidpixels += w*h;
         success = SendSolidRect(t);
         break;
     case 2:
