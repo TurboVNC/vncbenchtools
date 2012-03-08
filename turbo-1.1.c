@@ -23,7 +23,7 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this software; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
+ *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301,
  *  USA.
  */
 
@@ -303,6 +303,7 @@ ShutdownTightThreads(void)
         if (tparam[i].tightAfterBuf) free(tparam[i].tightAfterBuf);
         if (tparam[i].tightBeforeBuf) free(tparam[i].tightBeforeBuf);
         if (i != 0 && tparam[i].updateBuf) free(tparam[i].updateBuf);
+        if (tparam[i].j) tjDestroy(tparam[i].j);
         memset(&tparam[i], 0, sizeof(threadparam));
     }
     threadInit = FALSE;
@@ -358,18 +359,26 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
         if (!threadInit) return FALSE;
     }
 
-    /* Our studies have shown that, when JPEG is enabled, compression level 2
-       can reduce bandwidth by as much as 30% relative to compression level 1
-       on workloads that have low numbers of unique colors (that is, workloads
-       that aren't good candidates for JPEG compression.)  However, increasing
-       the amount of Zlib compression beyond this offers no significant
-       bandwidth savings except in very rare corner cases that are not
-       performance-critical to begin with. */
-    if (compressLevel > 2) compressLevel = 2;
+    /* We only allow compression levels that have a demonstrable performance
+       benefit.  CL 0 with JPEG reduces CPU usage for workloads that have low
+       numbers of unique colors, but the same thing can be accomplished by
+       using CL 0 without JPEG (AKA "Lossless Tight.")  CL 2 is a mixed bag.
+       It can be shown to reduce bandwidth (and commensurately increase CPU
+       usage) by typically 30-40% relative to CL 1, but only when it is used in
+       conjunction with high-quality JPEG, and only on workloads that have low
+       numbers of unique colors.  Increasing the amount of Zlib compression
+       beyond CL 2 cannot be shown to provide any significant bandwidth savings
+       except in very rare corner cases that are not performance-critical to
+       begin with, and higher Zlib levels increase CPU usage exponentially. */
+    if (qualityLevel != -1) {
+        if (compressLevel < 1) compressLevel = 1;
+        if (compressLevel > 2) compressLevel = 2;
+    }
 
-    /* With JPEG disabled, increasing the Zlib compression level offers no
-       significant bandwidth savings relative to compression level 1. */
-    if (qualityLevel == -1 && compressLevel > 1) compressLevel = 1;
+    /* With JPEG disabled, increasing the Zlib compression level beyond CL 1
+       offers no significant bandwidth savings, and the CPU usage starts to
+       increase exponentially. */
+    else if (compressLevel > 1) compressLevel = 1;
 
     if ( cl->format.depth == 24 && cl->format.redMax == 0xFF &&
          cl->format.greenMax == 0xFF && cl->format.blueMax == 0xFF ) {
