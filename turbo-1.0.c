@@ -311,6 +311,7 @@ ShutdownTightThreads(void)
         if (tparam[i].tightAfterBuf) free(tparam[i].tightAfterBuf);
         if (tparam[i].tightBeforeBuf) free(tparam[i].tightBeforeBuf);
         if (i != 0 && tparam[i].updateBuf) free(tparam[i].updateBuf);
+        if (tparam[i].j) tjDestroy(tparam[i].j);
         memset(&tparam[i], 0, sizeof(threadparam));
     }
     threadInit = FALSE;
