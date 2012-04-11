@@ -288,6 +288,7 @@ void
 ShutdownTightThreads(void)
 {
     int i;
+    if (!threadInit) return;
     if (_nt > 1) {
         for (i = 1; i < _nt; i++) {
             if(thnd[i]) {
@@ -423,6 +424,7 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
 
     status &= SendRectEncodingTight(&tparam[0], tparam[0].x, tparam[0].y,
                                     tparam[0].w, tparam[0].h);
+    if (!status) return FALSE;
     cl->rfbBytesSent[rfbEncodingTight] += tparam[0].bytessent;
     cl->rfbRectanglesSent[rfbEncodingTight] += tparam[0].rectsent;
 
@@ -1757,8 +1759,10 @@ SendJpegRect(t, x, y, w, h, quality)
         unsigned char *dst;
         int inRed, inGreen, inBlue, i, j;
 
-        if((tmpbuf = (unsigned char *)malloc(w * h * 3)) == NULL)
+        if((tmpbuf = (unsigned char *)malloc(w * h * 3)) == NULL) {
             rfbLog("Memory allocation failure!\n");
+            return 0;
+        }
         srcptr = (CARD16 *)
             &rfbScreen.pfbMemory[y * rfbScreen.paddedWidthInBytes + x * ps];
         dst = tmpbuf;
