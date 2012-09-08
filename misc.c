@@ -1,5 +1,6 @@
 /*  Copyright (C) 2000 Const Kaplinsky <const@ce.cctpu.edu.ru>
  *  Copyright (C) 2008 Sun Microsystems, Inc.
+ *  Copyright (C) 2012 D. R. Commander
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -25,6 +26,7 @@
 #include "rfb.h"
 
 extern Bool rfbSetTranslateFunction(rfbClientPtr cl);
+extern FILE *out;
 
 char updateBuf[UPDATE_BUF_SIZE], *sendBuf=NULL;
 int ublen, sblen=0, sbptr=0;
@@ -128,6 +130,25 @@ void InitEverything (int color_depth)
   image->bits_per_pixel = rfbClient.format.bitsPerPixel;
   image->bytes_per_line = ((image->width * image->bits_per_pixel / 8) + 3) & (~3);
   image->data = (char *)malloc(image->width * image->bytes_per_line);
+
+  rfbScreen.width = image->width;
+  rfbScreen.height = image->height;
+  rfbScreen.paddedWidthInBytes = image->bytes_per_line;
+  rfbScreen.sizeInBytes = image->height * image->bytes_per_line;
+
+  if (out) {
+    rfbServerInitMsg si;
+    char *name = "TurboVNC Benchmark";
+    si.framebufferWidth = Swap16IfLE(image->width);
+    si.framebufferHeight = Swap16IfLE(image->height);
+    memcpy(&si.format, &rfbServerFormat, sizeof(rfbPixelFormat));
+    si.format.redMax = Swap16IfLE(si.format.redMax);
+    si.format.greenMax = Swap16IfLE(si.format.greenMax);
+    si.format.blueMax = Swap16IfLE(si.format.blueMax);
+    si.nameLength = Swap32IfLE(strlen(name));
+    if (!WriteToSessionCapture((char *)&si, sz_rfbServerInitMsg)) exit(1);
+    if (!WriteToSessionCapture(name, strlen(name))) exit(1);
+  }
 }
 
 extern int decompress;
@@ -142,6 +163,7 @@ BOOL rfbSendUpdateBuf(rfbClientPtr cl)
     memcpy(&sendBuf[sblen], updateBuf, ublen);
     sblen += ublen;
   }
+  if (!WriteToSessionCapture(updateBuf, ublen)) return False;
   ublen = 0;
   return TRUE;
 }
@@ -176,3 +198,15 @@ rfbSendRectEncodingRaw(cl, x, y, w, h)
   return True;
 }
 
+Bool
+WriteToSessionCapture(char *buf, int len)
+{
+  if (out) {
+    int written = -1;
+    if ((written = fwrite(buf, len, 1, out)) < 1) {
+      perror("Cannot write to output file"); 
+      return False;
+    }
+  }
+  return True;
+}

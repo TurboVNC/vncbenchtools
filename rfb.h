@@ -4,6 +4,7 @@
 
 /*
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
+ *  Copyright (C) 2012 D. R. Commander.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -219,6 +220,8 @@ extern int rfbLog (char *fmt, ...);
 extern Bool rfbSendRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
 
 extern Bool ReadFromRFBServer(char *out, unsigned int n);
+
+extern Bool WriteToSessionCapture(char *buf, int len);
 
 #ifdef __cplusplus
 }

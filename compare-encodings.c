@@ -3,7 +3,7 @@
  *  $Id: compare-encodings.c,v 1.9 2011-10-07 09:15:45 dcommander Exp $
  *  Copyright (C) 2000 Const Kaplinsky <const@ce.cctpu.edu.ru>
  *  Copyright (C) 2008 Sun Microsystems, Inc.
- *  Copyright (C) 2010 D. R. Commander
+ *  Copyright (C) 2010, 2012 D. R. Commander
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -231,12 +231,6 @@ double gettime(void)
 /* #define SAVE_PPM_FILES */
 /* #define LAZY_TIGHT */
 
-/* Server messages */
-#define SMSG_FBUpdate         0
-#define SMSG_SetColourMap     1
-#define SMSG_Bell             2
-#define SMSG_ServerCutText    3
-
 static int color_depth = 16;
 static int sum_raw = 0, sum_tight = 0, sum_hextile = 0, sum_zlib = 0;
 static double t0, ttight[2]={0.,0.}, thextile[2]={0.,0.}, tzlib[2]={0.,0.};
@@ -249,36 +243,37 @@ static int parse_fb_update (FILE *in);
 static int parse_rectangle (FILE *in, int xpos, int ypos,
                             int width, int height, int rect_no, int enc);
 
+#ifdef SAVE_PPM_FILES
 static int save_rectangle (FILE *ppm, int width, int height, int depth);
+#endif
 
-static int handle_hextile8 (FILE *in, int width, int height);
-static int handle_hextile16 (FILE *in, int width, int height);
-static int handle_hextile32 (FILE *in, int width, int height);
+static int handle_hextile8 (FILE *in, int x, int y, int width, int height);
+static int handle_hextile16 (FILE *in, int x, int y, int width, int height);
+static int handle_hextile32 (FILE *in, int x, int y, int width, int height);
 
 static int handle_raw8 (FILE *in, int x, int y, int width, int height);
 static int handle_raw16 (FILE *in, int x, int y, int width, int height);
 static int handle_raw32 (FILE *in, int x, int y, int width, int height);
 
-static void copy_data (char *data, int rw, int rh,
-                       int x, int y, int w, int h, int bpp);
+static void copy_data (char *data, int x, int y, int w, int h, int bpp);
 
 static CARD32 get_CARD32 (char *ptr);
 static CARD16 get_CARD16 (char *ptr);
-
-static void do_compare (char *data, int w, int h);
 
 
 static int total_updates;
 static int total_rects;
 static unsigned long total_pixels;
 static int tightonly = 0;
+static int flip_rgb = 0;
 int decompress = 0;
+FILE *out = NULL;
 
 int main (int argc, char *argv[])
 {
   FILE *in;
   int i;
-  char *filename = NULL;
+  char *filename = NULL, *outfilename = NULL;
   int err;
 
   if (argc < 2) {
@@ -297,6 +292,13 @@ int main (int argc, char *argv[])
       tightonly = 1;
     } else if (strcmp (argv[i], "-d") == 0) {
       decompress = 1;
+    } else if (strcmp (argv[i], "-o") == 0) {
+      if (i < argc - 1) {
+        outfilename = argv[++i];
+        tightonly = 1;
+      }
+    } else if (strcmp (argv[i], "-r") == 0) {
+      flip_rgb = 1;
     } else filename = argv[i];
   }
 
@@ -306,7 +308,17 @@ int main (int argc, char *argv[])
     return 1;
   }
 
+  if (outfilename) {
+    decompress = 0;
+    out = fopen (outfilename, "wb");
+    if (out == NULL) {
+      perror ("Cannot open output file");
+      return 1;
+    }
+  }
+
   err = (do_convert (in) != 0);
+  if (outfilename) goto done;
   sleep(5);
   fseek(in, 0, SEEK_SET);
   sum_raw = sum_hextile = sum_zlib = sum_tight = 0;
@@ -318,8 +330,12 @@ int main (int argc, char *argv[])
   for(i = 0; i < 4; i++) zlibStreamActive[i] = False;
   err = (do_convert (in) != 0);
 
+  done:
   if (in != stdin)
     fclose (in);
+
+  if (out != NULL)
+    fclose (out);
 
   fprintf (stderr, (err) ? "Fatal error has occured.\n" : "Succeeded.\n");
   return err;
@@ -356,12 +372,12 @@ static int do_convert (FILE *in)
   msg_type = getc (in);
   while (msg_type != EOF) {
     switch (msg_type) {
-    case SMSG_FBUpdate:
+    case rfbFramebufferUpdate:
       if (parse_fb_update (in) != 0)
         return -1;
       break;
 
-    case SMSG_SetColourMap:
+    case rfbSetColourMapEntries:
       fprintf (stderr, "> SetColourMap...\n");
       if (fread (buf + 1, 1, 5, in) != 5) {
         fprintf (stderr, "Read error.\n");
@@ -376,11 +392,11 @@ static int do_convert (FILE *in)
       }
       break;
 
-    case SMSG_Bell:
+    case rfbBell:
       fprintf (stderr, "> Bell...\n");
       break;
 
-    case SMSG_ServerCutText:
+    case rfbServerCutText:
       fprintf (stderr, "> ServerCutText...\n");
       if (fread (buf + 1, 1, 7, in) != 7) {
         fprintf (stderr, "Read error.\n");
@@ -439,34 +455,50 @@ static int do_convert (FILE *in)
 
 static int parse_fb_update (FILE *in)
 {
-  char buf[12];
+  rfbFramebufferUpdateMsg msg;
+  rfbFramebufferUpdateRectHeader rh;
   CARD16 rect_count;
   CARD16 xpos, ypos, width, height;
   int i;
   CARD32 enc;
 
-  if (fread (buf + 1, 1, 3, in) != 3) {
+  memset(&msg, 0, sz_rfbFramebufferUpdateMsg);
+  if (fread (&msg.pad, 1, 3, in) != 3) {
     fprintf (stderr, "Read error.\n");
     return -1;
   }
 
-  rect_count = get_CARD16 (buf + 2);
+  rect_count = get_CARD16 ((char *)&msg.nRects);
+
+  if (out) msg.nRects = 0xFFFF;
+  if (!WriteToSessionCapture((char *)&msg, sz_rfbFramebufferUpdateMsg))
+    return False;
 
   for (i = 0; i < rect_count; i++) {
-    if (fread (buf, 1, 12, in) != 12) {
+    if (fread (&rh, 1, sz_rfbFramebufferUpdateRectHeader, in)
+	!= sz_rfbFramebufferUpdateRectHeader) {
       fprintf (stderr, "Read error.\n");
       return -1;
     }
-    xpos = get_CARD16 (buf);
-    ypos = get_CARD16 (buf + 2);
-    width = get_CARD16 (buf + 4);
-    height = get_CARD16 (buf + 6);
+    xpos = get_CARD16 ((char *)&rh.r.x);
+    ypos = get_CARD16 ((char *)&rh.r.y);
+    width = get_CARD16 ((char *)&rh.r.w);
+    height = get_CARD16 ((char *)&rh.r.h);
     total_pixels += width * height;
 
-    enc = get_CARD32 (buf + 8);
+    enc = get_CARD32 ((char *)&rh.encoding);
+
     parse_rectangle(in, xpos, ypos, width, height, i, enc);
     total_rects++;
   }
+
+  if (out) {
+    rh.encoding = Swap32IfLE(rfbEncodingLastRect);
+    rh.r.x = rh.r.y = rh.r.w = rh.r.h = 0;
+    if (!WriteToSessionCapture((char *)&rh, sz_rfbFramebufferUpdateRectHeader))
+      return False;
+  }
+
   total_updates++;
 
   return 0;
@@ -475,22 +507,24 @@ static int parse_fb_update (FILE *in)
 static int parse_rectangle (FILE *in, int xpos, int ypos,
                             int width, int height, int rect_no, int enc)
 {
-  char fname[80];
+#ifdef SAVE_PPM_FILES
+  char fname[80];  FILE *ppm;
+#endif
   int err, i;
   int pixel_bytes;
 
   if (enc == 5) {
     switch (color_depth) {
     case 8:
-      err = handle_hextile8 (in, width, height);
+      err = handle_hextile8 (in, xpos, ypos, width, height);
       pixel_bytes = 1;
       break;
     case 16:
-      err = handle_hextile16 (in, width, height);
+      err = handle_hextile16 (in, xpos, ypos, width, height);
       pixel_bytes = 2;
       break;
     default:                      /* 24 */
-      err = handle_hextile32 (in, width, height);
+      err = handle_hextile32 (in, xpos, ypos, width, height);
       pixel_bytes = 4;
     }
   } else if (enc == 0) {
@@ -517,16 +551,13 @@ static int parse_rectangle (FILE *in, int xpos, int ypos,
     return -1;
   }
 
-  sprintf (fname, "%.40s/%05d-%04d.ppm", SAVE_PATH, total_updates, rect_no);
-
 #ifdef SAVE_PPM_FILES
-
+  sprintf (fname, "%.40s/%05d-%04d.ppm", SAVE_PATH, total_updates, rect_no);
   ppm = fopen (fname, "w");
   if (ppm != NULL) {
-    save_rectangle (ppm, width, height, color_depth);
+    save_rectangle (ppm, rfbScreen.width, rfbScreen.height, color_depth);
     fclose (ppm);
   }
-
 #endif
 
   rfbClient.rfbBytesSent[rfbEncodingHextile] = 0;
@@ -540,7 +571,7 @@ static int parse_rectangle (FILE *in, int xpos, int ypos,
 
   sblen = sbptr = 0;
   if(!decompress) t0 = gettime();
-  if (!rfbSendRectEncodingHextile(&rfbClient, 0, 0, width, height)) {
+  if (!rfbSendRectEncodingHextile(&rfbClient, xpos, ypos, width, height)) {
       fprintf (stderr, "Error in hextile encoder!\n");
       return -1;
   }
@@ -590,7 +621,7 @@ static int parse_rectangle (FILE *in, int xpos, int ypos,
 
   sblen = sbptr = 0;
   if(!decompress) t0 = gettime();
-  if (!rfbSendRectEncodingZlib(&rfbClient, 0, 0, width, height)) {
+  if (!rfbSendRectEncodingZlib(&rfbClient, xpos, ypos, width, height)) {
       fprintf (stderr, "Error in zlib encoder!.\n");
       return -1;
   }
@@ -643,7 +674,7 @@ static int parse_rectangle (FILE *in, int xpos, int ypos,
   sblen = sbptr = 0;
   
   if(!decompress) t0 = gettime();
-  if (!rfbSendRectEncodingTight(&rfbClient, 0, 0, width, height)) {
+  if (!rfbSendRectEncodingTight(&rfbClient, xpos, ypos, width, height)) {
       fprintf (stderr, "Error in tight encoder!.\n");
       return -1;
   }
@@ -721,6 +752,7 @@ static int parse_rectangle (FILE *in, int xpos, int ypos,
   return 0;
 }
 
+#ifdef SAVE_PPM_FILES
 static int save_rectangle (FILE *ppm, int width, int height, int depth)
 {
   CARD8 *data8 = (CARD8 *) rfbScreen.pfbMemory;
@@ -774,6 +806,7 @@ static int save_rectangle (FILE *ppm, int width, int height, int depth)
 
   return 1;
 }
+#endif
 
 /*
  * Decoding raw rectangles.
@@ -796,7 +829,7 @@ static int handle_raw##bpp (FILE *in, int x, int y, int width, int height) \
     return -1;                                                             \
   }                                                                        \
                                                                            \
-  copy_data ((char *)data, width, height, x, y, width, height, bpp);       \
+  copy_data ((char *)data, x, y, width, height, bpp);                      \
   free(data);                                                              \
   return 0;                                                                \
 }
@@ -817,7 +850,8 @@ DEFINE_HANDLE_RAW(32)
 
 #define DEFINE_HANDLE_HEXTILE(bpp)                                         \
                                                                            \
-static int handle_hextile##bpp (FILE *in, int width, int height)           \
+static int handle_hextile##bpp (FILE *in, int xpos, int ypos, int width,   \
+                                int height)                                \
 {                                                                          \
   CARD##bpp bg = 0, fg = 0;                                                \
   int x, y, w, h;                                                          \
@@ -848,7 +882,7 @@ static int handle_hextile##bpp (FILE *in, int width, int height)           \
           return -1;                                                       \
         }                                                                  \
                                                                            \
-        copy_data ((char *)data, width, height, x, y, w, h, bpp);          \
+        copy_data ((char *)data, xpos + x, ypos + y, w, h, bpp);           \
         continue;                                                          \
       }                                                                    \
                                                                            \
@@ -870,7 +904,7 @@ static int handle_hextile##bpp (FILE *in, int width, int height)           \
       }                                                                    \
                                                                            \
       if (!(subencoding & rfbHextileAnySubrects)) {                        \
-        copy_data ((char *)data, width, height, x, y, w, h, bpp);          \
+        copy_data ((char *)data, xpos + x, ypos + y, w, h, bpp);           \
         continue;                                                          \
       }                                                                    \
                                                                            \
@@ -909,7 +943,7 @@ static int handle_hextile##bpp (FILE *in, int width, int height)           \
             data[jy * w + jx] = fg;                                        \
         }                                                                  \
       }                                                                    \
-      copy_data ((char *)data, width, height, x, y, w, h, bpp);            \
+      copy_data ((char *)data, xpos + x, ypos + y, w, h, bpp);             \
     }                                                                      \
   }                                                                        \
   return 0;                                                                \
@@ -919,22 +953,24 @@ DEFINE_HANDLE_HEXTILE(8)
 DEFINE_HANDLE_HEXTILE(16)
 DEFINE_HANDLE_HEXTILE(32)
 
-static void copy_data (char *data, int rw, int rh,
-                       int x, int y, int w, int h, int bpp)
+static void copy_data (char *data, int x, int y, int w, int h, int bpp)
 {
   int py;
   int pixel_bytes;
 
   pixel_bytes = bpp / 8;
 
-  rfbScreen.paddedWidthInBytes = rw * pixel_bytes;
-  rfbScreen.width = rw;
-  rfbScreen.height = rh;
-  rfbScreen.sizeInBytes = rw * rh * pixel_bytes;
-
   for (py = y; py < y + h; py++) {
-    memcpy (&rfbScreen.pfbMemory[(py * rw + x) * pixel_bytes], data,
-            w * pixel_bytes);
+    if (flip_rgb && pixel_bytes >= 3) {
+      char *ptr;
+      for (ptr = data; ptr < data + w * pixel_bytes; ptr += pixel_bytes) {
+        CARD8 temp = ptr[2];
+        ptr[2] = ptr[0];
+        ptr[0] = temp;
+      }
+    }
+    memcpy (&rfbScreen.pfbMemory[py * rfbScreen.paddedWidthInBytes +
+                                 x * pixel_bytes], data, w * pixel_bytes);
     data += w * pixel_bytes;
   }
 }
