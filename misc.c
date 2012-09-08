@@ -115,6 +115,18 @@ void InitEverything (int color_depth)
                                  (rfbServerFormat.blueShift & 7);
   }
 
+  if (out) {
+    // Assume the benchmark will be played back on a 24-bpp display
+    rfbClient.format.depth = 24;
+    rfbClient.format.bitsPerPixel = 32;
+    rfbClient.format.redMax = 0xFF;
+    rfbClient.format.greenMax = 0xFF;
+    rfbClient.format.blueMax = 0xFF;
+    rfbClient.format.redShift = 16;
+    rfbClient.format.greenShift = 8;
+    rfbClient.format.blueShift = 0;
+  }
+
   rfbSetTranslateFunction(&rfbClient);
 
   sendBuf = (char *)malloc(SEND_BUF_SIZE);
