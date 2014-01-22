@@ -4,7 +4,7 @@
 
 /*
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
- *  Copyright (C) 2012 D. R. Commander.  All Rights Reserved.
+ *  Copyright (C) 2012, 2014 D. R. Commander.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -36,7 +36,7 @@ typedef unsigned int   CARD32;
 
 #include "rfbproto.h"
 
-#define MAX_ENCODINGS 10
+#define MAX_ENCODINGS 17
 
 typedef int BOOL, Bool;
 #define FALSE  0
@@ -97,6 +97,14 @@ typedef struct rfbClientRec {
     rfbTranslateFnType translateFn;
 
     char *translateLookupTable;
+
+    /* ZRLE encoding */
+
+    void* zrleData;
+    int zywrleLevel;
+    int zywrleBuf[rfbZRLETileWidth * rfbZRLETileHeight];
+    char *zrleBeforeBuf;
+    void *paletteHelper;
 
     /* tight encoding -- preserve zlib streams' state for each client */
 
@@ -177,6 +185,10 @@ extern void rfbTranslateNone(char *table, rfbPixelFormat *in,
 extern Bool rfbSendRectEncodingHextile(rfbClientPtr cl, int x, int y, int w,
 				       int h);
 
+/* zrle.c */
+extern Bool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w,
+                                    int h);
+void rfbFreeZrleData(rfbClientPtr cl);
 
 /* tight.c */
 

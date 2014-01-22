@@ -3,7 +3,7 @@
  *  $Id: compare-encodings.c,v 1.9 2011-10-07 09:15:45 dcommander Exp $
  *  Copyright (C) 2000 Const Kaplinsky <const@ce.cctpu.edu.ru>
  *  Copyright (C) 2008 Sun Microsystems, Inc.
- *  Copyright (C) 2010, 2012 D. R. Commander
+ *  Copyright (C) 2010, 2012, 2014 D. R. Commander
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -232,8 +232,10 @@ double gettime(void)
 /* #define LAZY_TIGHT */
 
 static int color_depth = 16;
-static int sum_raw = 0, sum_tight = 0, sum_hextile = 0, sum_zlib = 0;
-static double t0, ttight[2]={0.,0.}, thextile[2]={0.,0.}, tzlib[2]={0.,0.};
+static int sum_raw = 0, sum_tight = 0, sum_hextile = 0, sum_zlib = 0,
+  sum_zrle = 0;
+static double t0, ttight[2]={0.,0.}, thextile[2]={0.,0.}, tzlib[2]={0.,0.},
+  tzrle[2]={0.,0.};
 static int tndx = 0;
 
 static void show_usage (char *program_name);
@@ -265,6 +267,7 @@ static int total_updates;
 static int total_rects;
 static unsigned long total_pixels;
 static int tightonly = 0;
+static int verbose = 0;
 static int flip_rgb = 0;
 int decompress = 0;
 FILE *out = NULL;
@@ -299,6 +302,8 @@ int main (int argc, char *argv[])
       }
     } else if (strcmp (argv[i], "-r") == 0) {
       flip_rgb = 1;
+    } else if (strcmp (argv[i], "-v") == 0) {
+      verbose = 1;
     } else filename = argv[i];
   }
 
@@ -321,7 +326,7 @@ int main (int argc, char *argv[])
   if (outfilename) goto done;
   sleep(5);
   fseek(in, 0, SEEK_SET);
-  sum_raw = sum_hextile = sum_zlib = sum_tight = 0;
+  sum_raw = sum_hextile = sum_zlib = sum_zrle = sum_tight = 0;
 	#ifdef TIGHT_STATISTICS
   fcrect = ndxrect = jpegrect = monorect = solidrect = 0;
   fcpixels = ndxpixels = jpegpixels = monopixels = solidpixels = 0;
@@ -365,9 +370,10 @@ static int do_convert (FILE *in)
   total_rects = 0;
   total_pixels = 0;
 
-  printf ("upd.no -                              Bytes per rectangle:\n"
-          "   rect.no   coords     size       raw |hextile| zlib | tight\n"
-          "---------- -------------------- -------+-------+------+------\n");
+  if (verbose)
+    printf ("upd.no -                              Bytes per rectangle:\n"
+            "   rect.no   coords     size       raw |hextile| zlib | ZRLE | tight\n"
+            "---------- -------------------- -------+-------+------+------+------\n");
 
   msg_type = getc (in);
   while (msg_type != EOF) {
@@ -418,19 +424,21 @@ static int do_convert (FILE *in)
     msg_type = getc (in);
   }
 
-  if(tightonly) sum_raw=sum_hextile=sum_zlib=INT_MAX;
+  if(tightonly) sum_raw=sum_hextile=sum_zlib=sum_zrle=INT_MAX;
 
   printf ("\nGrand totals:\n"
-          "                               raw    |  hextile  |   zlib   |  tight  \n"
-          "                            ----------+-----------+----------+---------\n"
-          "Bytes in all rectangles:    %9d | %9d | %8d | %8d\n"
-          "Tight/XXX bandwidth saving: %8.2f%% | %8.2f%% | %7.2f%% |\n",
-          sum_raw, sum_hextile, sum_zlib, sum_tight,
+          "                          raw    |  hextile  |   zlib   |   ZRLE   |  tight  \n"
+          "                       ----------+-----------+----------+----------+---------\n"
+          "Bytes in all rects:    %9d | %9d | %8d | %8d | %8d\n"
+          "Tight/XXX B/W saving:  %8.2f%% | %8.2f%% | %7.2f%% | %7.2f%% |\n",
+          sum_raw, sum_hextile, sum_zlib, sum_zrle, sum_tight,
           (double)(sum_raw - sum_tight) * 100 / (double) sum_raw,
           (double)(sum_hextile - sum_tight) * 100 / (double) sum_hextile,
-          (double)(sum_zlib - sum_tight) * 100 / (double) sum_zlib);
-  printf ("%scoding time:              ......... | %8.4fs | %7.4fs | %7.4fs\n",
-          decompress? "De":"En", thextile[tndx], tzlib[tndx], ttight[tndx]);
+          (double)(sum_zlib - sum_tight) * 100 / (double) sum_zlib,
+          (double)(sum_zrle - sum_tight) * 100 / (double) sum_zrle);
+  printf ("%scoding time:         ......... | %8.4fs | %7.4fs | %7.4fs | %7.4fs\n",
+          decompress? "De":"En", thextile[tndx], tzlib[tndx], tzrle[tndx],
+          ttight[tndx]);
 
   #ifdef TIGHT_STATISTICS
   printf("Solid rectangles = %lu, pixels = %f mil\n", solidrect, (double)solidpixels/1000000.);
@@ -445,9 +453,10 @@ static int do_convert (FILE *in)
 	 (double)total_pixels/(double)total_rects);
   printf("\n");
   if(tndx==1)
-  printf ("Avg. %scoding time:         ......... | %8.4fs | %7.4fs | %7.4fs\n\n",
+  printf ("Avg. %scoding time:    ......... | %8.4fs | %7.4fs | %7.4fs | %7.4fs\n\n",
           decompress? "De":"En", (thextile[0]+thextile[1])/2.,
-          (tzlib[0]+tzlib[1])/2., (ttight[0]+ttight[1])/2.);
+          (tzlib[0]+tzlib[1])/2., (tzrle[0]+tzrle[1])/2.,
+          (ttight[0]+ttight[1])/2.);
   tndx++;
 
   return (ferror (in)) ? -1 : 0;
@@ -564,6 +573,8 @@ static int parse_rectangle (FILE *in, int xpos, int ypos,
   rfbClient.rfbRectanglesSent[rfbEncodingHextile] = 0;
   rfbClient.rfbBytesSent[rfbEncodingZlib] = 0;
   rfbClient.rfbRectanglesSent[rfbEncodingZlib] = 0;
+  rfbClient.rfbBytesSent[rfbEncodingZRLE] = 0;
+  rfbClient.rfbRectanglesSent[rfbEncodingZRLE] = 0;
   rfbClient.rfbBytesSent[rfbEncodingTight] = 0;
   rfbClient.rfbRectanglesSent[rfbEncodingTight] = 0;
 
@@ -669,10 +680,25 @@ static int parse_rectangle (FILE *in, int xpos, int ypos,
     }
   }
 
+  sblen = sbptr = 0;
+  if (!decompress) {
+    sblen = sbptr = 0;
+    t0 = gettime();
+    if (!rfbSendRectEncodingZRLE(&rfbClient, xpos, ypos, width, height)) {
+      fprintf (stderr, "Error in ZRLE encoder!.\n");
+      return -1;
+    }
+    if(!rfbSendUpdateBuf(&rfbClient)) {
+      fprintf(stderr, "Could not flush output buffer\n");
+      return -1;
+    }
+    tzrle[tndx] += gettime() - t0;
+    rfbFreeZrleData(&rfbClient);
+  }
+
   }
 
   sblen = sbptr = 0;
-  
   if(!decompress) t0 = gettime();
   if (!rfbSendRectEncodingTight(&rfbClient, xpos, ypos, width, height)) {
       fprintf (stderr, "Error in tight encoder!.\n");
@@ -735,18 +761,19 @@ static int parse_rectangle (FILE *in, int xpos, int ypos,
     #endif
   }
 
-#if 0
-  printf ("%05d-%04d (%4d,%3d %4d*%3d): %7d|%7d|%6d|%6d\n",
-          total_updates, rect_no, xpos, ypos, width, height,
-          width * height * pixel_bytes + 12,
-          rfbClient.rfbBytesSent[rfbEncodingHextile],
-          rfbClient.rfbBytesSent[rfbEncodingZlib],
-          rfbClient.rfbBytesSent[rfbEncodingTight]);
-#endif
+  if (verbose)
+    printf ("%05d-%04d (%4d,%3d %4d*%3d): %7d|%7d|%6d|%6d|%6d\n",
+            total_updates, rect_no, xpos, ypos, width, height,
+            width * height * pixel_bytes + 12,
+            rfbClient.rfbBytesSent[rfbEncodingHextile],
+            rfbClient.rfbBytesSent[rfbEncodingZlib],
+            rfbClient.rfbBytesSent[rfbEncodingZRLE],
+            rfbClient.rfbBytesSent[rfbEncodingTight]);
 
   sum_raw += width * height * pixel_bytes + 12;
   sum_hextile += rfbClient.rfbBytesSent[rfbEncodingHextile];
   sum_tight += rfbClient.rfbBytesSent[rfbEncodingTight];
+  sum_zrle += rfbClient.rfbBytesSent[rfbEncodingZRLE];
   sum_zlib += rfbClient.rfbBytesSent[rfbEncodingZlib];
 
   return 0;

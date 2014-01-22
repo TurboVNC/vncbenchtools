@@ -1,6 +1,6 @@
 /*  Copyright (C) 2000 Const Kaplinsky <const@ce.cctpu.edu.ru>
  *  Copyright (C) 2008 Sun Microsystems, Inc.
- *  Copyright (C) 2012 D. R. Commander
+ *  Copyright (C) 2012, 2014 D. R. Commander
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -39,19 +39,8 @@ XImage _image, *image=&_image;
 
 void InitEverything (int color_depth)
 {
-  int i;
+  memset(&rfbClient, 0, sizeof(rfbClient));
 
-  for (i = 0; i < MAX_ENCODINGS; i++) {
-    rfbClient.rfbRectanglesSent[i] = 0;
-    rfbClient.rfbBytesSent[i] = 0;
-  }
-  rfbClient.rfbFramebufferUpdateMessagesSent = 0;
-  rfbClient.rfbRawBytesEquivalent = 0;
-
-  rfbClient.compStreamInited = 0;
-  for (i = 0; i < MAX_ENCODINGS; i++) {
-    rfbClient.zsActive[i] = FALSE;
-  }
   rfbClient.reset = TRUE;
 
   rfbClient.format.depth = color_depth;

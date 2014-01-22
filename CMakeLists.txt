@@ -28,7 +28,8 @@ endif()
 message(STATUS "Using ${ENCODER} encoder")
 message(STATUS "Using ${DECODER} decoder")
 
-set(SOURCES compare-encodings.c misc.c hextile.c zlib.c translate.c)
+set(SOURCES compare-encodings.c misc.c hextile.c zlib.c zrle.c
+  zrleoutstream.c zrlepalettehelper.c translate.c)
 
 include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
 
