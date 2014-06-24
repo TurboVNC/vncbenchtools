@@ -28,6 +28,9 @@ endif()
 message(STATUS "Using ${ENCODER} encoder")
 message(STATUS "Using ${DECODER} decoder")
 
+math(EXPR BITS "${CMAKE_SIZEOF_VOID_P} * 8")
+message(STATUS "${BITS}-bit build")
+
 set(SOURCES compare-encodings.c misc.c hextile.c zlib.c zrle.c
   zrleoutstream.c zrlepalettehelper.c translate.c)
 
