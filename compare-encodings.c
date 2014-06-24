@@ -271,12 +271,13 @@ static int verbose = 0;
 static int flip_rgb = 0;
 int decompress = 0;
 FILE *out = NULL;
+char *outfilename = NULL;
 
 int main (int argc, char *argv[])
 {
   FILE *in;
   int i;
-  char *filename = NULL, *outfilename = NULL;
+  char *filename = NULL;
   int err;
 
   if (argc < 2) {
@@ -313,6 +314,7 @@ int main (int argc, char *argv[])
     return 1;
   }
 
+  #ifndef H264
   if (outfilename) {
     decompress = 0;
     out = fopen (outfilename, "wb");
@@ -321,8 +323,12 @@ int main (int argc, char *argv[])
       return 1;
     }
   }
+  #endif
 
   err = (do_convert (in) != 0);
+  #ifdef H264
+  ResetH264Encoder(&rfbClient);
+  #endif
   if (outfilename) goto done;
   sleep(5);
   fseek(in, 0, SEEK_SET);

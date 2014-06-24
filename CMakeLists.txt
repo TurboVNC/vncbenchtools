@@ -6,7 +6,7 @@ include(CheckCSourceRuns)
 project(vncbenchtools)
 
 set(ENCODER_OPTIONS
-  "tight-1.1, tight-1.3.9, turbo-0.4, turbo-0.5, turbo-1.0, turbo-1.1, tiger-1.1, tiger-1.2")
+  "tight-1.1, tight-1.3.9, turbo-0.4, turbo-0.5, turbo-1.0, turbo-1.1, tiger-1.1, tiger-1.2, h264")
 
 set(ENCODER "" CACHE STRING
   "Which Tight/Turbo/Tiger encoder to use (one of ${ENCODER_OPTIONS})")
@@ -88,6 +88,23 @@ endif()
 
 if(ENCODER MATCHES turbo-1.* OR DECODER MATCHES turbo-1.*)
   set(LINK_LIBRARIES ${LINK_LIBRARIES} pthread)
+endif()
+
+if(ENCODER MATCHES h264)
+  include(cmakescripts/FindTurboJPEG.cmake)
+  set(LINK_LIBRARIES ${LINK_LIBRARIES} ${TJPEG_LIBRARY})
+  if(BITS EQUAL 64)
+    set(DEFAULT_X264_DIR /opt/x264/linux64)
+  else()
+    set(DEFAULT_X264_DIR /opt/x264/linux)
+  endif()
+  set(X264_DIR ${DEFAULT_X264_DIR} CACHE PATH
+    "Directory in which libx264 is installed (default: ${DEFAULT_X264_DIR})")
+  message(STATUS "X264_DIR = ${X264_DIR}")
+  include_directories(${X264_DIR}/include ${CMAKE_SOURCE_DIR}/flv)
+  add_definitions(-DH264)
+  set(LINK_LIBRARIES ${LINK_LIBRARIES} ${X264_DIR}/lib/libx264.a m)
+  set(SOURCES ${SOURCES} flv/flv.c flv/flv_bytestream.c)
 endif()
 
 if(ENCODER MATCHES tiger-*)
