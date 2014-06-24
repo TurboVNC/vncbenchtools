@@ -51,6 +51,8 @@ unsigned long solidrect=0, solidpixels=0, monorect=0, monopixels=0, ndxrect=0,
 tjhandle tj = NULL;
 hnd_t output_handle = 0;
 int frames = 0;
+int stride[3];
+unsigned char *plane[3];
 
 
 /*
@@ -93,8 +95,10 @@ Bool rfbSendRectEncodingTight(rfbClientPtr cl, int x, int y, int w, int h)
   x264_nal_t* nals = NULL;
   int i_nals = 0;
   x264_picture_t pic_out;
-  int pixelFormat = TJPF_RGB, pixelSize = rfbServerFormat.bitsPerPixel / 8;
+  int pixelFormat = TJPF_RGB, pixelSize = rfbServerFormat.bitsPerPixel / 8,
+    pitch = rfbScreen.paddedWidthInBytes;
   x264_param_t param;
+  unsigned char *dstBuf[3], *srcPtr;
 
   if (!encoder) {
     x264_param_default_preset(&param, "veryfast", "zerolatency");
@@ -131,12 +135,13 @@ Bool rfbSendRectEncodingTight(rfbClientPtr cl, int x, int y, int w, int h)
     x264_picture_init(&pic_in);
     pic_in.img.i_csp = X264_CSP_I420;
     pic_in.img.i_plane = 3;
-    pic_in.img.i_stride[0] = PAD(pw, 4);
-    pic_in.img.i_stride[1] = pic_in.img.i_stride[2] = PAD(pw / 2, 4);
-    pic_in.img.plane[0] = yuvImage;
-    pic_in.img.plane[1] = pic_in.img.plane[0] +
+    stride[0] = pic_in.img.i_stride[0] = PAD(pw, 4);
+    stride[1] = stride[2] = pic_in.img.i_stride[1] = pic_in.img.i_stride[2]
+      = PAD(pw / 2, 4);
+    plane[0] = pic_in.img.plane[0] = yuvImage;
+    plane[1] = pic_in.img.plane[1] = pic_in.img.plane[0] +
       pic_in.img.i_stride[0] * ph;
-    pic_in.img.plane[2] = pic_in.img.plane[1] +
+    plane[2] = pic_in.img.plane[2] = pic_in.img.plane[1] +
       pic_in.img.i_stride[1] * (ph / 2);
   }
   if (outfilename && !output_handle) {
@@ -169,9 +174,16 @@ Bool rfbSendRectEncodingTight(rfbClientPtr cl, int x, int y, int w, int h)
     else if (pixelFormat == TJPF_BGRX) pixelFormat = TJPF_XBGR;
   }
 
-  if (tjEncodeYUV2(tj, rfbScreen.pfbMemory, rfbScreen.width,
-    rfbScreen.paddedWidthInBytes, rfbScreen.height, pixelFormat, yuvImage,
-    TJSAMP_420, 0) < 0) {
+  srcPtr = &rfbScreen.pfbMemory[pitch * y + pixelSize * x];
+  if (x % 2 != 0) {x--;  w++;}
+  if (y % 2 != 0) {y--;  h++;}
+  if (w % 2 != 0) w++;
+  if (h % 2 != 0) h++;
+  dstBuf[0] = plane[0] + stride[0] * y + x;
+  dstBuf[1] = plane[1] + stride[1] * (y / 2) + (x / 2);
+  dstBuf[2] = plane[2] + stride[2] * (y / 2) + (x / 2);
+  if (tjEncodeYUV3(tj, srcPtr, w, pitch, h, pixelFormat, dstBuf, stride,
+      TJSAMP_420, 0) < 0) {
     rfbLog("TurboJPEG Error: %s\n", tjGetErrorStr());
     return FALSE;
   }

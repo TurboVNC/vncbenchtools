@@ -1,5 +1,5 @@
 /*
- * Copyright (C)2009-2013 D. R. Commander.  All Rights Reserved.
+ * Copyright (C)2009-2014 D. R. Commander.  All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -49,16 +49,16 @@
 /**
  * The number of chrominance subsampling options
  */
-#define TJ_NUMSAMP 5
+#define TJ_NUMSAMP 6
 
 /**
  * Chrominance subsampling options.
- * When an image is converted from the RGB to the YCbCr colorspace as part of
- * the JPEG compression process, some of the Cb and Cr (chrominance) components
- * can be discarded or averaged together to produce a smaller image with little
- * perceptible loss of image clarity (the human eye is more sensitive to small
- * changes in brightness than small changes in color.)  This is called
- * "chrominance subsampling".
+ * When pixels are converted from RGB to YCbCr (see #TJCS_YCbCr) or from CMYK
+ * to YCCK (see #TJCS_YCCK) as part of the JPEG compression process, some of
+ * the Cb and Cr (chrominance) components can be discarded or averaged together
+ * to produce a smaller image with little perceptible loss of image clarity
+ * (the human eye is more sensitive to small changes in brightness than to
+ * small changes in color.)  This is called "chrominance subsampling".
  * <p>
  * NOTE: Technically, the JPEG format uses the YCbCr colorspace, but per the
  * convention of the digital video community, the TurboJPEG API uses "YUV" to
@@ -91,7 +91,18 @@ enum TJSAMP
    * chrominance component for every 1x2 block of pixels in the source image.
    * Note that 4:4:0 subsampling is not fully accelerated in libjpeg-turbo.
    */
-  TJSAMP_440
+  TJSAMP_440,
+  /**
+   * 4:1:1 chrominance subsampling.  The JPEG or YUV image will contain one
+   * chrominance component for every 4x1 block of pixels in the source image.
+   * JPEG images compressed with 4:1:1 subsampling will be almost exactly the
+   * same size as those compressed with 4:2:0 subsampling, and in the
+   * aggregate, both subsampling methods produce approximately the same
+   * perceptual quality.  However, 4:1:1 is better able to reproduce sharp
+   * horizontal features.  Note that 4:1:1 subsampling is not fully accelerated
+   * in libjpeg-turbo.
+   */
+  TJSAMP_411
 };
 
 /**
@@ -100,9 +111,10 @@ enum TJSAMP
  * - 8x8 for no subsampling or grayscale
  * - 16x8 for 4:2:2
  * - 8x16 for 4:4:0
- * - 16x16 for 4:2:0 
+ * - 16x16 for 4:2:0
+ * - 32x8 for 4:1:1
  */
-static const int tjMCUWidth[TJ_NUMSAMP]  = {8, 16, 16, 8, 8};
+static const int tjMCUWidth[TJ_NUMSAMP]  = {8, 16, 16, 8, 8, 32};
 
 /**
  * MCU block height (in pixels) for a given level of chrominance subsampling.
@@ -110,15 +122,16 @@ static const int tjMCUWidth[TJ_NUMSAMP]  = {8, 16, 16, 8, 8};
  * - 8x8 for no subsampling or grayscale
  * - 16x8 for 4:2:2
  * - 8x16 for 4:4:0
- * - 16x16 for 4:2:0 
+ * - 16x16 for 4:2:0
+ * - 32x8 for 4:1:1
  */
-static const int tjMCUHeight[TJ_NUMSAMP] = {8, 8, 16, 8, 16};
+static const int tjMCUHeight[TJ_NUMSAMP] = {8, 8, 16, 8, 16, 8};
 
 
 /**
  * The number of pixel formats
  */
-#define TJ_NUMPF 11
+#define TJ_NUMPF 12
 
 /**
  * Pixel formats
@@ -193,8 +206,25 @@ enum TJPF
    * decompressing, the X component is guaranteed to be 0xFF, which can be
    * interpreted as an opaque alpha channel.
    */
-  TJPF_ARGB
+  TJPF_ARGB,
+  /**
+   * CMYK pixel format.  Unlike RGB, which is an additive color model used
+   * primarily for display, CMYK (Cyan/Magenta/Yellow/Key) is a subtractive
+   * color model used primarily for printing.  In the CMYK color model, the
+   * value of each color component typically corresponds to an amount of cyan,
+   * magenta, yellow, or black ink that is applied to a white background.  In
+   * order to convert between CMYK and RGB, it is necessary to use a color
+   * management system (CMS.)  A CMS will attempt to map colors within the
+   * printer's gamut to perceptually similar colors in the display's gamut and
+   * vice versa, but the mapping is typically not 1:1 or reversible, nor can it
+   * be defined with a simple formula.  Thus, such a conversion is out of scope
+   * for a codec library.  However, the TurboJPEG API allows for compressing
+   * CMYK pixels into a YCCK JPEG image (see #TJCS_YCCK) and decompressing YCCK
+   * JPEG images into CMYK pixels.
+   */
+  TJPF_CMYK
 };
+
 
 /**
  * Red offset (in bytes) for a given pixel format.  This specifies the number
@@ -202,7 +232,7 @@ enum TJPF
  * instance, if a pixel of format TJ_BGRX is stored in <tt>char pixel[]</tt>,
  * then the red component will be <tt>pixel[tjRedOffset[TJ_BGRX]]</tt>.
  */
-static const int tjRedOffset[TJ_NUMPF] = {0, 2, 0, 2, 3, 1, 0, 0, 2, 3, 1};
+static const int tjRedOffset[TJ_NUMPF] = {0, 2, 0, 2, 3, 1, 0, 0, 2, 3, 1, -1};
 /**
  * Green offset (in bytes) for a given pixel format.  This specifies the number
  * of bytes that the green component is offset from the start of the pixel.
@@ -210,19 +240,81 @@ static const int tjRedOffset[TJ_NUMPF] = {0, 2, 0, 2, 3, 1, 0, 0, 2, 3, 1};
  * <tt>char pixel[]</tt>, then the green component will be
  * <tt>pixel[tjGreenOffset[TJ_BGRX]]</tt>.
  */
-static const int tjGreenOffset[TJ_NUMPF] = {1, 1, 1, 1, 2, 2, 0, 1, 1, 2, 2};
+static const int tjGreenOffset[TJ_NUMPF] = {1, 1, 1, 1, 2, 2, 0, 1, 1, 2, 2, -1};
 /**
  * Blue offset (in bytes) for a given pixel format.  This specifies the number
  * of bytes that the Blue component is offset from the start of the pixel.  For
  * instance, if a pixel of format TJ_BGRX is stored in <tt>char pixel[]</tt>,
  * then the blue component will be <tt>pixel[tjBlueOffset[TJ_BGRX]]</tt>.
  */
-static const int tjBlueOffset[TJ_NUMPF] = {2, 0, 2, 0, 1, 3, 0, 2, 0, 1, 3};
+static const int tjBlueOffset[TJ_NUMPF] = {2, 0, 2, 0, 1, 3, 0, 2, 0, 1, 3, -1};
 
 /**
  * Pixel size (in bytes) for a given pixel format.
  */
-static const int tjPixelSize[TJ_NUMPF] = {3, 3, 4, 4, 4, 4, 1, 4, 4, 4, 4};
+static const int tjPixelSize[TJ_NUMPF] = {3, 3, 4, 4, 4, 4, 1, 4, 4, 4, 4, 4};
+
+
+/**
+ * The number of JPEG colorspaces
+ */
+#define TJ_NUMCS 5
+
+/**
+ * JPEG colorspaces
+ */
+enum TJCS
+{
+  /**
+   * RGB colorspace.  When compressing the JPEG image, the R, G, and B
+   * components in the source image are reordered into image planes, but no
+   * colorspace conversion or subsampling is performed.  RGB JPEG images can be
+   * decompressed to any of the extended RGB pixel formats or grayscale, but
+   * they cannot be decompressed to YUV images.
+   */
+  TJCS_RGB=0,
+  /**
+   * YCbCr colorspace.  YCbCr is not an absolute colorspace but rather a
+   * mathematical transformation of RGB designed solely for storage and
+   * transmission.  YCbCr images must be converted to RGB before they can
+   * actually be displayed.  In the YCbCr colorspace, the Y (luminance)
+   * component represents the black & white portion of the original image, and
+   * the Cb and Cr (chrominance) components represent the color portion of the
+   * original image.  Originally, the analog equivalent of this transformation
+   * allowed the same signal to drive both black & white and color televisions,
+   * but JPEG images use YCbCr primarily because it allows the color data to be
+   * optionally subsampled for the purposes of reducing bandwidth or disk
+   * space.  YCbCr is the most common JPEG colorspace, and YCbCr JPEG images
+   * can be compressed from and decompressed to any of the extended RGB pixel
+   * formats or grayscale, or they can be decompressed to YUV planar images.
+   */
+  TJCS_YCbCr,
+  /**
+   * Grayscale colorspace.  The JPEG image retains only the luminance data (Y
+   * component), and any color data from the source image is discarded.
+   * Grayscale JPEG images can be compressed from and decompressed to any of
+   * the extended RGB pixel formats or grayscale, or they can be decompressed
+   * to YUV planar images.
+   */
+  TJCS_GRAY,
+  /**
+   * CMYK colorspace.  When compressing the JPEG image, the C, M, Y, and K
+   * components in the source image are reordered into image planes, but no
+   * colorspace conversion or subsampling is performed.  CMYK JPEG images can
+   * only be decompressed to CMYK pixels.
+   */
+  TJCS_CMYK,
+  /**
+   * YCCK colorspace.  YCCK (AKA "YCbCrK") is not an absolute colorspace but
+   * rather a mathematical transformation of CMYK designed solely for storage
+   * and transmission.  It is to CMYK as YCbCr is to RGB.  CMYK pixels can be
+   * reversibly transformed into YCCK, and as with YCbCr, the chrominance
+   * components in the YCCK pixels can be subsampled without incurring major
+   * perceptual loss.  YCCK JPEG images can only be compressed from and
+   * decompressed to CMYK pixels.
+   */
+  TJCS_YCCK
+};
 
 
 /**
@@ -230,26 +322,6 @@ static const int tjPixelSize[TJ_NUMPF] = {3, 3, 4, 4, 4, 4, 1, 4, 4, 4, 4};
  * OpenGL) order, not top-down (X11) order.
  */
 #define TJFLAG_BOTTOMUP        2
-/**
- * Turn off CPU auto-detection and force TurboJPEG to use MMX code (if the
- * underlying codec supports it.)
- */
-#define TJFLAG_FORCEMMX        8
-/**
- * Turn off CPU auto-detection and force TurboJPEG to use SSE code (if the
- * underlying codec supports it.)
- */
-#define TJFLAG_FORCESSE       16
-/**
- * Turn off CPU auto-detection and force TurboJPEG to use SSE2 code (if the
- * underlying codec supports it.)
- */
-#define TJFLAG_FORCESSE2      32
-/**
- * Turn off CPU auto-detection and force TurboJPEG to use SSE3 code (if the
- * underlying codec supports it.)
- */
-#define TJFLAG_FORCESSE3     128
 /**
  * When decompressing an image that was compressed using chrominance
  * subsampling, use the fastest chrominance upsampling algorithm available in
@@ -512,11 +584,11 @@ DLLEXPORT tjhandle DLLCALL tjInitCompress(void);
 
 
 /**
- * Compress an RGB or grayscale image into a JPEG image.
+ * Compress an RGB, grayscale, or CMYK image into a JPEG image.
  *
  * @param handle a handle to a TurboJPEG compressor or transformer instance
- * @param srcBuf pointer to an image buffer containing RGB or grayscale pixels
- *        to be compressed
+ * @param srcBuf pointer to an image buffer containing RGB, grayscale, or
+ *        CMYK pixels to be compressed
  * @param width width (in pixels) of the source image
  * @param pitch bytes per line of the source image.  Normally, this should be
  *        <tt>width * #tjPixelSize[pixelFormat]</tt> if the image is unpadded,
@@ -564,6 +636,63 @@ DLLEXPORT int DLLCALL tjCompress2(tjhandle handle, unsigned char *srcBuf,
 
 
 /**
+ * Compress a YUV planar image into a JPEG image.  Note that, if the width or
+ * height of the YUV image is not an even multiple of the MCU block size
+ * (see #tjMCUWidth and #tjMCUHeight), then an intermediate buffer copy will be
+ * performed within TurboJPEG.
+ *
+ * @param handle a handle to a TurboJPEG compressor or transformer instance
+ * @param srcBuf pointer to an image buffer containing a YUV planar image
+ *        to be compressed.  The Y, U (Cb), and V (Cr) image planes should be
+ *        stored sequentially in the buffer, and the size of each plane
+ *        is determined by the specified width, height, padding, and level of
+ *        chrominance subsampling.  If the chrominance components are
+ *        subsampled along the horizontal dimension, then the width of the
+ *        luminance plane should be padded to the nearest multiple of 2 (same
+ *        goes for the height of the luminance plane, if the chrominance
+ *        components are subsampled along the vertical dimension.)  This is
+ *        irrespective of any additional padding specified in the <tt>pad</tt>
+ *        parameter.
+ * @param width width (in pixels) of the source image
+ * @param pad the line padding used in the source image.  For instance, if each
+ *        line in each plane of the YUV image is padded to the nearest multiple
+ *        of 4 bytes, then <tt>pad</tt> should be set to 4.
+ * @param height height (in pixels) of the source image
+ * @param subsamp the level of chrominance subsampling used in the source
+ *        image (see @ref TJSAMP "Chrominance subsampling options".)
+ * @param jpegBuf address of a pointer to an image buffer that will receive the
+ *        JPEG image.  TurboJPEG has the ability to reallocate the JPEG buffer
+ *        to accommodate the size of the JPEG image.  Thus, you can choose to:
+ *        -# pre-allocate the JPEG buffer with an arbitrary size using
+ *        #tjAlloc() and let TurboJPEG grow the buffer as needed,
+ *        -# set <tt>*jpegBuf</tt> to NULL to tell TurboJPEG to allocate the
+ *        buffer for you, or
+ *        -# pre-allocate the buffer to a "worst case" size determined by
+ *        calling #tjBufSize().  This should ensure that the buffer never has
+ *        to be re-allocated (setting #TJFLAG_NOREALLOC guarantees this.)
+ *        .
+ *        If you choose option 1, <tt>*jpegSize</tt> should be set to the
+ *        size of your pre-allocated buffer.  In any case, unless you have
+ *        set #TJFLAG_NOREALLOC, you should always check <tt>*jpegBuf</tt> upon
+ *        return from this function, as it may have changed.
+ * @param jpegSize pointer to an unsigned long variable that holds the size of
+ *        the JPEG image buffer.  If <tt>*jpegBuf</tt> points to a
+ *        pre-allocated buffer, then <tt>*jpegSize</tt> should be set to the
+ *        size of the buffer.  Upon return, <tt>*jpegSize</tt> will contain the
+ *        size of the JPEG image (in bytes.)
+ * @param jpegQual the image quality of the generated JPEG image (1 = worst,
+          100 = best)
+ * @param flags the bitwise OR of one or more of the @ref TJFLAG_BOTTOMUP
+ *        "flags".
+ *
+ * @return 0 if successful, or -1 if an error occurred (see #tjGetErrorStr().)
+*/
+DLLEXPORT int DLLCALL tjCompressFromYUV(tjhandle handle, unsigned char *srcBuf,
+  int width, int pad, int height, int subsamp, unsigned char **jpegBuf,
+  unsigned long *jpegSize, int jpegQual, int flags);
+
+
+/**
  * The maximum size of the buffer (in bytes) required to hold a JPEG image with
  * the given parameters.  The number of bytes returned by this function is
  * larger than the size of the uncompressed source image.  The reason for this
@@ -592,6 +721,8 @@ DLLEXPORT unsigned long DLLCALL tjBufSize(int width, int height,
  * the given parameters.
  *
  * @param width width of the image (in pixels)
+ * @param pad the width of each line in each plane of the image is padded to
+ *        the nearest multiple of this number of bytes (must be a power of 2.)
  * @param height height of the image (in pixels)
  * @param subsamp level of chrominance subsampling in the image (see
  *        @ref TJSAMP "Chrominance subsampling options".)
@@ -599,22 +730,22 @@ DLLEXPORT unsigned long DLLCALL tjBufSize(int width, int height,
  * @return the size of the buffer (in bytes) required to hold the image, or
  * -1 if the arguments are out of bounds.
  */
-DLLEXPORT unsigned long DLLCALL tjBufSizeYUV(int width, int height,
+DLLEXPORT unsigned long DLLCALL tjBufSizeYUV2(int width, int pad, int height,
   int subsamp);
 
 
 /**
  * Encode an RGB or grayscale image into a YUV planar image.  This function
- * uses the accelerated color conversion routines in TurboJPEG's underlying
- * codec to produce a planar YUV image that is suitable for X Video.
- * Specifically, if the chrominance components are subsampled along the
- * horizontal dimension, then the width of the luminance plane is padded to the
- * nearest multiple of 2 in the output image (same goes for the height of the
- * luminance plane, if the chrominance components are subsampled along the
- * vertical dimension.)  Also, each line of each plane in the output image is
- * padded to 4 bytes.  Although this will work with any subsampling option, it
- * is really only useful in combination with TJ_420, which produces an image
- * compatible with the I420 (AKA "YUV420P") format.
+ * uses the accelerated color conversion routines in the underlying
+ * codec but does not execute any of the other steps in the JPEG compression
+ * process.  The Y, U (Cb), and V (Cr) image planes are stored sequentially
+ * into the destination buffer, and the size of each plane is determined by the
+ * width and height of the source image, as well as the specified padding and
+ * level of chrominance subsampling.  If the chrominance components are
+ * subsampled along the horizontal dimension, then the width of the luminance
+ * plane is padded to the nearest multiple of 2 in the output image (same goes
+ * for the height of the luminance plane, if the chrominance components are
+ * subsampled along the vertical dimension.)
  * <p>
  * NOTE: Technically, the JPEG format uses the YCbCr colorspace, but per the
  * convention of the digital video community, the TurboJPEG API uses "YUV" to
@@ -635,20 +766,26 @@ DLLEXPORT unsigned long DLLCALL tjBufSizeYUV(int width, int height,
  * @param pixelFormat pixel format of the source image (see @ref TJPF
  *        "Pixel formats".)
  * @param dstBuf pointer to an image buffer that will receive the YUV image.
- *        Use #tjBufSizeYUV() to determine the appropriate size for this buffer
- *        based on the image width, height, and level of chrominance
- *        subsampling.
+ *        Use #tjBufSizeYUV2() to determine the appropriate size for this
+ *        buffer based on the image width, height, padding, and level of
+ *        chrominance subsampling.
+ * @param pad the width of each line in each plane of the YUV image will be
+ *        padded to the nearest multiple of this number of bytes (must be a
+ *        power of 2.)  To generate images suitable for X Video, <tt>pad</tt>
+ *        should be set to 4.
  * @param subsamp the level of chrominance subsampling to be used when
  *        generating the YUV image (see @ref TJSAMP
- *        "Chrominance subsampling options".)
+ *        "Chrominance subsampling options".)  To generate images suitable for
+ *        X Video, <tt>subsamp</tt> should be set to @ref TJSAMP_420.  This
+ *        produces an image compatible with the I420 (AKA "YUV420P") format.
  * @param flags the bitwise OR of one or more of the @ref TJFLAG_BOTTOMUP
  *        "flags".
  *
  * @return 0 if successful, or -1 if an error occurred (see #tjGetErrorStr().)
 */
-DLLEXPORT int DLLCALL tjEncodeYUV2(tjhandle handle,
-  unsigned char *srcBuf, int width, int pitch, int height, int pixelFormat,
-  unsigned char *dstBuf, int subsamp, int flags);
+DLLEXPORT int DLLCALL tjEncodeYUV3(tjhandle handle, unsigned char *srcBuf,
+	int width, int pitch, int height, int pixelFormat, unsigned char **dstBuf,
+	int *stride, int subsamp, int flags);
 
 
 /**
@@ -673,12 +810,15 @@ DLLEXPORT tjhandle DLLCALL tjInitDecompress(void);
  * @param jpegSubsamp pointer to an integer variable that will receive the
  *        level of chrominance subsampling used when compressing the JPEG image
  *        (see @ref TJSAMP "Chrominance subsampling options".)
+ * @param jpegColorspace pointer to an integer variable that will receive one
+ *        of the JPEG colorspace constants, indicating the colorspace of the
+ *        JPEG image (see @ref TJCS "JPEG colorspaces".)
  *
  * @return 0 if successful, or -1 if an error occurred (see #tjGetErrorStr().)
 */
-DLLEXPORT int DLLCALL tjDecompressHeader2(tjhandle handle,
+DLLEXPORT int DLLCALL tjDecompressHeader3(tjhandle handle,
   unsigned char *jpegBuf, unsigned long jpegSize, int *width, int *height,
-  int *jpegSubsamp);
+  int *jpegSubsamp, int *jpegColorspace);
 
 
 /**
@@ -695,7 +835,7 @@ DLLEXPORT tjscalingfactor* DLLCALL tjGetScalingFactors(int *numscalingfactors);
 
 
 /**
- * Decompress a JPEG image to an RGB or grayscale image.
+ * Decompress a JPEG image to an RGB, grayscale, or CMYK image.
  *
  * @param handle a handle to a TurboJPEG decompressor or transformer instance
  * @param jpegBuf pointer to a buffer containing the JPEG image to decompress
@@ -722,8 +862,8 @@ DLLEXPORT tjscalingfactor* DLLCALL tjGetScalingFactors(int *numscalingfactors);
  *        calling #TJSCALED() with the JPEG image width and one of the scaling
  *        factors returned by #tjGetScalingFactors().)  You can also be clever
  *        and use the pitch parameter to skip lines, etc.  Setting this
- *        parameter to 0 is the equivalent of setting it to <tt>scaledWidth
- *        * #tjPixelSize[pixelFormat]</tt>.
+ *        parameter to 0 is the equivalent of setting it to
+ *        <tt>scaledWidth * #tjPixelSize[pixelFormat]</tt>.
  * @param height desired height (in pixels) of the destination image.  If this
  *        is different than the height of the JPEG image being decompressed,
  *        then TurboJPEG will use scaling in the JPEG decompressor to generate
@@ -745,11 +885,11 @@ DLLEXPORT int DLLCALL tjDecompress2(tjhandle handle,
 /**
  * Decompress a JPEG image to a YUV planar image.  This function performs JPEG
  * decompression but leaves out the color conversion step, so a planar YUV
- * image is generated instead of an RGB image.  The padding of the planes in
- * this image is the same as in the images generated by #tjEncodeYUV2().  Note
- * that, if the width or height of the image is not an even multiple of the MCU
- * block size (see #tjMCUWidth and #tjMCUHeight), then an intermediate buffer
- * copy will be performed within TurboJPEG.
+ * image is generated instead of an RGB image.  The structure of the planes in
+ * this image is the same as in the images generated by #tjEncodeYUV3().  Note
+ * that, if the width or height of the JPEG image is not an even multiple of
+ * the MCU block size (see #tjMCUWidth and #tjMCUHeight), then an intermediate
+ * buffer copy will be performed within TurboJPEG.
  * <p>
  * NOTE: Technically, the JPEG format uses the YCbCr colorspace, but per the
  * convention of the digital video community, the TurboJPEG API uses "YUV" to
@@ -759,18 +899,90 @@ DLLEXPORT int DLLCALL tjDecompress2(tjhandle handle,
  * @param jpegBuf pointer to a buffer containing the JPEG image to decompress
  * @param jpegSize size of the JPEG image (in bytes)
  * @param dstBuf pointer to an image buffer that will receive the YUV image.
- *        Use #tjBufSizeYUV() to determine the appropriate size for this buffer
- *        based on the image width, height, and level of subsampling.
+ *        Use #tjBufSizeYUV2() to determine the appropriate size for this
+ *        buffer based on the image width, height, padding, and level of
+ *        subsampling.
+ * @param width desired width (in pixels) of the YUV image.  If this is
+ *        different than the width of the JPEG image being decompressed, then
+ *        TurboJPEG will use scaling in the JPEG decompressor to generate the
+ *        largest possible image that will fit within the desired width.  If
+ *        <tt>width</tt> is set to 0, then only the height will be considered
+ *        when determining the scaled image size.
+ * @param pad the width of each line in each plane of the YUV image will be
+ *        padded to the nearest multiple of this number of bytes (must be a
+ *        power of 2.)  To generate images suitable for X Video, <tt>pad</tt>
+ *        should be set to 4.
+ * @param height desired height (in pixels) of the YUV image.  If this is
+ *        different than the height of the JPEG image being decompressed, then
+ *        TurboJPEG will use scaling in the JPEG decompressor to generate the
+ *        largest possible image that will fit within the desired height.  If
+ *        <tt>height</tt> is set to 0, then only the width will be considered
+ *        when determining the scaled image size.
  * @param flags the bitwise OR of one or more of the @ref TJFLAG_BOTTOMUP
  *        "flags".
  *
  * @return 0 if successful, or -1 if an error occurred (see #tjGetErrorStr().)
  */
-DLLEXPORT int DLLCALL tjDecompressToYUV(tjhandle handle,
+DLLEXPORT int DLLCALL tjDecompressToYUV2(tjhandle handle,
   unsigned char *jpegBuf, unsigned long jpegSize, unsigned char *dstBuf,
-  int flags);
+  int width, int pad, int height, int flags);
 
 
+/**
+ * Decode a YUV planar image into an RGB or grayscale image.  This function
+ * uses the accelerated color conversion routines in the underlying
+ * codec but does not execute any of the other steps in the JPEG decompression
+ * process.  The Y, U (Cb), and V (Cr) image planes should be stored
+ * sequentially in the source buffer, and the size of each plane is determined
+ * by the width and height of the source image, as well as the specified
+ * padding and level of chrominance subsampling.  If the chrominance components
+ * are subsampled along the horizontal dimension, then the width of the
+ * luminance plane should be padded to the nearest multiple of 2 in the input
+ * image (same goes for the height of the luminance plane, if the chrominance
+ * components are subsampled along the vertical dimension.)
+ * <p>
+ * NOTE: Technically, the JPEG format uses the YCbCr colorspace, but per the
+ * convention of the digital video community, the TurboJPEG API uses "YUV" to
+ * refer to an image format consisting of Y, Cb, and Cr image planes.
+ *
+ * @param handle a handle to a TurboJPEG decompressor or transformer instance
+ * @param srcBuf pointer to an image buffer containing a YUV planar image to be
+ *        decoded.  The size of this buffer should match the value returned
+ *        by #tjBufSizeYUV2() for the given image width, height, padding, and
+ *        level of chrominance subsampling.
+ * @param pad Use this parameter to specify that the width of each line in each
+ *        plane of the YUV source image is padded to the nearest multiple of
+ *        this number of bytes (must be a power of 2.)
+ * @param subsamp the level of chrominance subsampling used in the YUV source
+ *        image (see @ref TJSAMP "Chrominance subsampling options".)
+ * @param dstBuf pointer to an image buffer that will receive the decoded
+ *        image.  This buffer should normally be <tt>pitch * height</tt>
+ *        bytes in size, but the <tt>dstBuf</tt> pointer can also be used to
+ *        decode into a specific region of a larger buffer.
+ * @param width width (in pixels) of the source and destination images
+ * @param pitch bytes per line of the destination image.  Normally, this should
+ *        be <tt>width * #tjPixelSize[pixelFormat]</tt> if the destination
+ *        image is unpadded, or <tt>#TJPAD(width *
+ *        #tjPixelSize[pixelFormat])</tt> if each line of the destination
+ *        image should be padded to the nearest 32-bit boundary, as is the case
+ *        for Windows bitmaps.  You can also be clever and use the pitch
+ *        parameter to skip lines, etc.  Setting this parameter to 0 is the
+ *        equivalent of setting it to <tt>width *
+ *        #tjPixelSize[pixelFormat]</tt>.
+ * @param height height (in pixels) of the source and destination images
+ * @param pixelFormat pixel format of the destination image (see @ref TJPF
+ *        "Pixel formats".)
+ * @param flags the bitwise OR of one or more of the @ref TJFLAG_BOTTOMUP
+ *        "flags".
+ *
+ * @return 0 if successful, or -1 if an error occurred (see #tjGetErrorStr().)
+ */
+DLLEXPORT int DLLCALL tjDecodeYUV(tjhandle handle, unsigned char *srcBuf,
+	int pad, int subsamp, unsigned char *dstBuf, int width, int pitch,
+	int height, int pixelFormat, int flags);
+
+
+#if 0
 /**
  * Create a new TurboJPEG transformer instance.
  *
@@ -832,6 +1044,7 @@ DLLEXPORT tjhandle DLLCALL tjInitTransform(void);
 DLLEXPORT int DLLCALL tjTransform(tjhandle handle, unsigned char *jpegBuf,
   unsigned long jpegSize, int n, unsigned char **dstBufs,
   unsigned long *dstSizes, tjtransform *transforms, int flags);
+#endif
 
 
 /**
@@ -882,6 +1095,13 @@ DLLEXPORT void DLLCALL tjFree(unsigned char *buffer);
 DLLEXPORT char* DLLCALL tjGetErrorStr(void);
 
 
+/* Deprecated functions and macros */
+#define TJFLAG_FORCEMMX        8
+#define TJFLAG_FORCESSE       16
+#define TJFLAG_FORCESSE2      32
+#define TJFLAG_FORCESSE3     128
+
+
 /* Backward compatibility functions and macros (nothing to see here) */
 #define NUMSUBOPT TJ_NUMSAMP
 #define TJ_444 TJSAMP_444
@@ -905,6 +1125,9 @@ DLLEXPORT unsigned long DLLCALL TJBUFSIZE(int width, int height);
 DLLEXPORT unsigned long DLLCALL TJBUFSIZEYUV(int width, int height,
   int jpegSubsamp);
 
+DLLEXPORT unsigned long DLLCALL tjBufSizeYUV(int width, int height,
+  int subsamp);
+
 DLLEXPORT int DLLCALL tjCompress(tjhandle handle, unsigned char *srcBuf,
   int width, int pitch, int height, int pixelSize, unsigned char *dstBuf,
   unsigned long *compressedSize, int jpegSubsamp, int jpegQual, int flags);
@@ -913,12 +1136,24 @@ DLLEXPORT int DLLCALL tjEncodeYUV(tjhandle handle,
   unsigned char *srcBuf, int width, int pitch, int height, int pixelSize,
   unsigned char *dstBuf, int subsamp, int flags);
 
+DLLEXPORT int DLLCALL tjEncodeYUV2(tjhandle handle,
+  unsigned char *srcBuf, int width, int pitch, int height, int pixelFormat,
+  unsigned char *dstBuf, int subsamp, int flags);
+
 DLLEXPORT int DLLCALL tjDecompressHeader(tjhandle handle,
   unsigned char *jpegBuf, unsigned long jpegSize, int *width, int *height);
+
+DLLEXPORT int DLLCALL tjDecompressHeader2(tjhandle handle,
+  unsigned char *jpegBuf, unsigned long jpegSize, int *width, int *height,
+  int *jpegSubsamp);
 
 DLLEXPORT int DLLCALL tjDecompress(tjhandle handle,
   unsigned char *jpegBuf, unsigned long jpegSize, unsigned char *dstBuf,
   int width, int pitch, int height, int pixelSize, int flags);
+
+DLLEXPORT int DLLCALL tjDecompressToYUV(tjhandle handle,
+  unsigned char *jpegBuf, unsigned long jpegSize, unsigned char *dstBuf,
+  int flags);
 
 
 /**
