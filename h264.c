@@ -182,7 +182,7 @@ Bool rfbSendRectEncodingTight(rfbClientPtr cl, int x, int y, int w, int h)
   dstBuf[0] = plane[0] + stride[0] * y + x;
   dstBuf[1] = plane[1] + stride[1] * (y / 2) + (x / 2);
   dstBuf[2] = plane[2] + stride[2] * (y / 2) + (x / 2);
-  if (tjEncodeYUV3(tj, srcPtr, w, pitch, h, pixelFormat, dstBuf, stride,
+  if (tjEncodeYUVPlanes(tj, srcPtr, w, pitch, h, pixelFormat, dstBuf, stride,
       TJSAMP_420, 0) < 0) {
     rfbLog("TurboJPEG Error: %s\n", tjGetErrorStr());
     return FALSE;

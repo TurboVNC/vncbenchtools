@@ -38,7 +38,7 @@ include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
 
 set(LINK_LIBRARIES z)
 
-if(ENCODER MATCHES tig* OR DECODER MATCHES tig* OR ENCODER MATCHES h264)
+if(ENCODER MATCHES tig* OR DECODER MATCHES tig*)
   # Check for libjpeg
   find_package(JPEG REQUIRED)
 
@@ -81,10 +81,10 @@ if(ENCODER MATCHES tig* OR DECODER MATCHES tig* OR ENCODER MATCHES h264)
   include_directories(${JPEG_INCLUDE_DIR})
 endif()
 
-if((ENCODER MATCHES turbo-* OR DECODER MATCHES turbo-*)
-  AND NOT ENCODER MATCHES h264)
+if(ENCODER MATCHES turbo-* OR ENCODER MATCHES h264 OR DECODER MATCHES turbo-*)
   include(cmakescripts/FindTurboJPEG.cmake)
   set(LINK_LIBRARIES ${LINK_LIBRARIES} ${TJPEG_LIBRARY})
+  include_directories(${TJPEG_INCLUDE_DIR})
 endif()
 
 if(ENCODER MATCHES turbo-1.* OR DECODER MATCHES turbo-1.*)
@@ -100,12 +100,10 @@ if(ENCODER MATCHES h264)
   set(X264_DIR ${DEFAULT_X264_DIR} CACHE PATH
     "Directory in which libx264 is installed (default: ${DEFAULT_X264_DIR})")
   message(STATUS "X264_DIR = ${X264_DIR}")
-  include_directories(${X264_DIR}/include ${CMAKE_SOURCE_DIR}/flv
-    ${CMAKE_SOURCE_DIR}/turbojpeg)
+  include_directories(${X264_DIR}/include ${CMAKE_SOURCE_DIR}/flv)
   add_definitions(-DH264)
   set(LINK_LIBRARIES ${LINK_LIBRARIES} ${X264_DIR}/lib/libx264.a m)
-  set(SOURCES ${SOURCES} flv/flv.c flv/flv_bytestream.c turbojpeg/turbojpeg.c
-    turbojpeg/jdatadst-tj.c turbojpeg/jdatasrc-tj.c)
+  set(SOURCES ${SOURCES} flv/flv.c flv/flv_bytestream.c)
 endif()
 
 if(ENCODER MATCHES tiger-*)
