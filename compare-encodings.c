@@ -100,6 +100,10 @@ static Bool jpegError;
 
 tjhandle tjhnd=NULL;
 
+#ifdef H264
+extern Bool ResetH264Encoder(rfbClientPtr);
+#endif
+
 /*
  * JPEG source manager functions for JPEG decompression in Tight decoder.
  */
@@ -327,7 +331,7 @@ int main (int argc, char *argv[])
 
   err = (do_convert (in) != 0);
   #ifdef H264
-  ResetH264Encoder(&rfbClient);
+  err |= (ResetH264Encoder(&rfbClient) != TRUE);
   #endif
   if (outfilename) goto done;
   sleep(5);
@@ -339,7 +343,7 @@ int main (int argc, char *argv[])
   #endif
   decompStreamInited = False;
   for(i = 0; i < 4; i++) zlibStreamActive[i] = False;
-  err = (do_convert (in) != 0);
+  err |= (do_convert (in) != 0);
 
   done:
   if (in != stdin)

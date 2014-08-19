@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdio.h>
 #include "rfb.h"
 #include "x264.h"
 #include "turbojpeg.h"
@@ -41,7 +42,7 @@ extern char *outfilename;
 
 /* Globals */
 
-x264_picture_t pic_in, pic_out;
+x264_picture_t pic_in;
 Bool pic_init = FALSE;
 x264_t *encoder = NULL;
 unsigned char *yuvImage = NULL;
@@ -53,6 +54,14 @@ hnd_t output_handle = 0;
 int frames = 0;
 int stride[3];
 unsigned char *plane[3];
+Bool frameSent = FALSE;
+
+
+/* Frame rate governor */
+
+extern double gettime();
+static double lastFrame = -1.;
+static double fps = 0.0;
 
 
 /*
@@ -101,16 +110,27 @@ Bool rfbSendRectEncodingTight(rfbClientPtr cl, int x, int y, int w, int h)
   unsigned char *dstBuf[3], *srcPtr;
 
   if (!encoder) {
+    char *env=NULL;
+
+    if ((env = getenv("H264_FPS")) != NULL && strlen(env) > 0) {
+      double temp = -1;
+      if (sscanf(env, "%lf", &temp) == 1 && temp > 0.0)
+        fps = temp;
+      rfbLog("H.264 frame rate set to %.2lf\n", fps);
+    }
+    
     x264_param_default_preset(&param, "veryfast", "zerolatency");
     param.i_threads = 1;
     param.i_width = rfbScreen.width;
     param.i_height = rfbScreen.height;
-    param.i_fps_num = param.i_timebase_den = 30000;
+    param.i_fps_num = param.i_timebase_den =
+      fps > 0.0 ? (int)(fps * 1001.0 + 0.5) : 30000;
     param.i_fps_den = param.i_timebase_num = 1001;
     param.rc.i_rc_method = X264_RC_CQP;
     param.rc.i_qp_constant = 10;
     param.b_repeat_headers = 0;
     param.b_annexb = 0;
+    param.i_keyint_max = 200000;
     x264_param_apply_profile(&param, "baseline");
     encoder = x264_encoder_open(&param);
     x264_encoder_parameters(encoder, &param);
@@ -174,7 +194,7 @@ Bool rfbSendRectEncodingTight(rfbClientPtr cl, int x, int y, int w, int h)
     else if (pixelFormat == TJPF_BGRX) pixelFormat = TJPF_XBGR;
   }
 
-  srcPtr = &rfbScreen.pfbMemory[pitch * y + pixelSize * x];
+  srcPtr = (unsigned char *)&rfbScreen.pfbMemory[pitch * y + pixelSize * x];
   if (x % 2 != 0) {x--;  w++;}
   if (y % 2 != 0) {y--;  h++;}
   if (w % 2 != 0) w++;
@@ -186,6 +206,15 @@ Bool rfbSendRectEncodingTight(rfbClientPtr cl, int x, int y, int w, int h)
       TJSAMP_420, 0) < 0) {
     rfbLog("TurboJPEG Error: %s\n", tjGetErrorStr());
     return FALSE;
+  }
+
+  if (fps > 0.0) {
+    if (lastFrame >= 0.0 &&
+        gettime() - lastFrame < 1.0 / fps) {
+      frameSent = FALSE;
+      return TRUE;
+    }
+    lastFrame = gettime();
   }
 
   pic_in.i_pts = frames;
@@ -203,13 +232,42 @@ Bool rfbSendRectEncodingTight(rfbClientPtr cl, int x, int y, int w, int h)
     }
   }
   frames++;
+  frameSent = TRUE;
 
-  return SendCompressedData(cl, nals[0].p_payload, frame_size);
+  return SendCompressedData(cl, (char *)nals[0].p_payload, frame_size);
 }
 
 
-void ResetH264Encoder(rfbClientPtr cl)
+Bool ResetH264Encoder(rfbClientPtr cl)
 {
+  Bool retval = TRUE;
+
+  if (!frameSent) {
+    x264_nal_t* nals = NULL;
+    int i_nals = 0;
+    x264_picture_t pic_out;
+
+    int frame_size = x264_encoder_encode(encoder, &nals, &i_nals, &pic_in,
+                                         &pic_out);
+    if (frame_size < 0) {
+      rfbLog("x264 Error\n");
+      retval = FALSE;
+    } else {
+      if (output_handle) {
+        if (flv_output.write_frame(output_handle, nals[0].p_payload,
+                                   frame_size, &pic_out) != frame_size) {
+          rfbLog("Could not write output file\n");
+          retval = FALSE;
+        }
+      }
+      frames++;
+      if (!SendCompressedData(cl, (char *)nals[0].p_payload, frame_size)) {
+        rfbLog("Could not send compressed data\n");
+        retval = FALSE;
+      }
+    }
+  }
+
   if (encoder) {
     x264_encoder_close(encoder);
     encoder = NULL;
@@ -228,4 +286,7 @@ void ResetH264Encoder(rfbClientPtr cl)
   if (output_handle)
     flv_output.close_file(output_handle, frames - 1, 0);
   frames = 0;
+  lastFrame = -1.;
+
+  return retval;
 }
