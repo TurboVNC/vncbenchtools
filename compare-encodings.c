@@ -80,7 +80,7 @@ static char zlib_buffer[ZLIB_BUFFER_SIZE];
 
 /* Four independent compression streams for zlib library. */
 static z_stream zlibStream[4];
-static Bool zlibStreamActive[4] = {
+Bool zlibStreamActive[4] = {
   False, False, False, False
 };
 

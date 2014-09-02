@@ -6,13 +6,13 @@ include(CheckCSourceRuns)
 project(vncbenchtools)
 
 set(ENCODER_OPTIONS
-  "tight-1.1, tight-1.3.9, turbo-0.4, turbo-0.5, turbo-1.0, turbo-1.1, tiger-1.1, tiger-1.2, h264")
+  "tight-1.1, tight-1.3.9, turbo-0.4, turbo-0.5, turbo-1.0, turbo-1.1, tiger-1.1, tiger-1.2, tiger-1.4, h264")
 
 set(ENCODER "" CACHE STRING
   "Which Tight/Turbo/Tiger encoder to use (one of ${ENCODER_OPTIONS})")
 
 set(DECODER_OPTIONS
-  "tight-1.3.9, turbo-0.4, turbo-0.5, turbo-1.0, tiger-1.1, tiger-1.2")
+  "tight-1.3.9, turbo-0.4, turbo-0.5, turbo-1.0, tiger-1.1, tiger-1.2, tiger-1.4")
 
 set(DECODER "" CACHE STRING
   "Which Tight/Turbo/Tiger decoder to use (one of ${DECODER_OPTIONS})")
