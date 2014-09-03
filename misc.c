@@ -202,7 +202,7 @@ rfbSendRectEncodingRaw(cl, x, y, w, h)
 Bool
 WriteToSessionCapture(char *buf, int len)
 {
-  if (out) {
+  if (out && len > 0) {
     int written = -1;
     if ((written = fwrite(buf, len, 1, out)) < 1) {
       perror("Cannot write to output file"); 
