@@ -73,10 +73,7 @@ Bool rfbSendRectEncodingTight(rfbClientPtr _cl, int x, int y, int w, int h)
     clientPF = cpf;
 
     if (!fb) fb = new FullFramePixelBuffer(serverPF, rfbScreen.width,
-      rfbScreen.height, (rdr::U8 *)rfbScreen.pfbMemory,
-      rfbScreen.paddedWidthInBytes * 8 / rfbScreen.bitsPerPixel);
-
-    int stride;
+      rfbScreen.height, (rdr::U8 *)rfbScreen.pfbMemory, rfbScreen.width);
 
     if (compareFB) {
       if (!cut) cut = new ComparingUpdateTracker(fb);

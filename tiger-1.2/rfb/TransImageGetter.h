@@ -25,60 +25,81 @@
 #define __RFB_TRANSIMAGEGETTER_H__
 
 #include <rfb/Rect.h>
-#include "rfb.h"
-
-extern rfbClientPtr cl;
+#include <rfb/PixelFormat.h>
+#include <rfb/PixelTransformer.h>
+#include <rfb/ImageGetter.h>
 
 namespace rfb {
 
-  class TransImageGetter {
+  class ColourMap;
+  class PixelBuffer;
+  class ColourCube;
+
+  class TransImageGetter : public ImageGetter,
+                           public PixelTransformer {
   public:
 
-    TransImageGetter(void) {};
-    ~TransImageGetter(void) {};
+    TransImageGetter(bool econ=false);
+    virtual ~TransImageGetter();
 
-    void getImage(void* outPtr, const Rect& r, int outStride=0) {
-      int inStride;
-      const rdr::U8* inPtr = getRawPixelsR(r, &inStride);
-      if (!outStride) outStride = r.width();
-      translateRect((void*)inPtr, inStride, Rect(0, 0, r.width(), r.height()),
-                    outPtr, outStride, Point(0, 0));
-    }
+    // init() is called to initialise the translation tables.  The PixelBuffer
+    // argument gives the source data and format details, outPF gives the
+    // client's pixel format.  If the client has a colour map, then the writer
+    // argument is used to send a SetColourMapEntries message to the client.
 
-    const rdr::U8 *getRawPixelsR(const Rect &r, int *stride) {
-      *stride = rfbScreen.paddedWidthInBytes / (rfbScreen.bitsPerPixel/8);
-      return (const rdr::U8 *)(rfbScreen.pfbMemory
-        + (rfbScreen.paddedWidthInBytes * r.tl.y)
-        + (r.tl.x * (rfbScreen.bitsPerPixel / 8)));
-    }
+    void init(PixelBuffer* pb, const PixelFormat& outPF,
+              ColourCube* cube=0);
 
-    void translateRect(void* inPtr, int inStride, Rect inRect,
-                       void* outPtr, int outStride, Point outCoord) {
-      char *in, *out;
+    // setColourMapEntries() is called when the PixelBuffer has a colour map
+    // which has changed.  firstColour and nColours specify which part of the
+    // colour map has changed.  If nColours is 0, this means the rest of the
+    // colour map.  The PixelBuffer previously passed to init() must have a
+    // valid ColourMap object.  If the client also has a colour map, then the
+    // writer argument is used to send a SetColourMapEntries message to the
+    // client.  If the client is true colour then instead we update the
+    // internal translation table - in this case the caller should also make
+    // sure that the client receives an update of the relevant parts of the
+    // framebuffer (the simplest thing to do is just update the whole
+    // framebuffer, though it is possible to be smarter than this).
 
-      in = (char*)inPtr;
-      in += rfbServerFormat.bitsPerPixel/8 * inRect.tl.x;
-      in += (inStride * rfbServerFormat.bitsPerPixel/8) * inRect.tl.y;
+    void setColourMapEntries(int firstColour, int nColours);
 
-      out = (char*)outPtr;
-      out += cl->format.bitsPerPixel/8 * outCoord.x;
-      out += (outStride * cl->format.bitsPerPixel/8) * outCoord.y;
+    // getImage() gets the given rectangle of data from the PixelBuffer,
+    // translates it into the client's pixel format and puts it in the buffer
+    // pointed to by the outPtr argument.  The optional outStride argument can
+    // be used where padding is required between the output scanlines (the
+    // padding will be outStride-r.width() pixels).
+    void getImage(void* outPtr, const Rect& r, int outStride=0);
 
-      (*cl->translateFn)(cl->translateLookupTable, &rfbServerFormat,
-        &cl->format, (char *)in, (char *)out,
-        inStride * rfbServerFormat.bitsPerPixel/8, inRect.width(),
-        inRect.height());
-    }
+    // getRawPixelsR() gets the given rectangle of data directly from the
+    // underlying PixelBuffer, bypassing the translation logic. Only use
+    // this when doing something that's independent of the client's pixel
+    // format.
+    const rdr::U8 *getRawPixelsR(const Rect &r, int *stride);
 
-    inline void translatePixels(const void* inPtr, void* outPtr, int nPixels) {
-      (*cl->translateFn)(cl->translateLookupTable, &rfbServerFormat,
-        &cl->format, (char *)inPtr, (char *)outPtr, nPixels, nPixels, 1);
-    }
+    // setPixelBuffer() changes the pixel buffer to be used.  The new pixel
+    // buffer MUST have the same pixel format as the old one - if not you
+    // should call init() instead.
+    void setPixelBuffer(PixelBuffer* pb_) { pb = pb_; }
 
-    bool willTransform(void) {
-      return cl->translateFn != rfbTranslateNone;
-    }
+    PixelBuffer *getPixelBuffer(void) { return pb; }
 
+    // setOffset() sets an offset which is subtracted from the coordinates of
+    // the rectangle given to getImage().
+    void setOffset(const Point& offset_) { offset = offset_; }
+
+  private:
+    static void cmCallback(int firstColour, int nColours,
+                           ColourMap* cm, void* data);
+
+  private:
+    bool economic;
+    PixelBuffer* pb;
+    PixelFormat outPF;
+    rdr::U8* table;
+    transFnType transFn;
+    ColourCube* cube;
+    Point offset;
   };
 }
 #endif

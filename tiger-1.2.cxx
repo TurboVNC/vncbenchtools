@@ -16,16 +16,19 @@
  * USA.
  */
 
+#include <rdr/Exception.h>
+#include <rfb/ComparingUpdateTracker.h>
+#include <rdr/RFBOutStream.h>
+#include <rfb/TightEncoder.h>
 #include "rfb.h"
 
 static int compressLevel = 1;
 static int qualityLevel = 8;
 
-#include <rfb/PixelFormat.h>
-
 using namespace rfb;
 
 rfbClientPtr cl = NULL;
+rdr::RFBOutStream rfbos;
 static rdr::U8* imageBuf = NULL;
 static int imageBufSize = 0;
 
@@ -46,12 +49,10 @@ rdr::U8* getImageBuf(int required, const PixelFormat& pf)
   return imageBuf;
 }
 
-#include <rdr/Exception.h>
-#include <rfb/TightEncoder.h>
-#include <rfb/ComparingUpdateTracker.h>
-
 static TightEncoder *te = NULL;
 static TransImageGetter image_getter;
+
+PixelFormat clientPF;
 
 Bool compareFB = FALSE;
 
@@ -74,14 +75,27 @@ Bool rfbSendRectEncodingTight(rfbClientPtr _cl, int x, int y, int w, int h)
 
     te->setCompressLevel(compressLevel);
     te->setQualityLevel(qualityLevel);
+
+    PixelFormat serverPF(rfbServerFormat.bitsPerPixel, rfbServerFormat.depth,
+      rfbServerFormat.bigEndian==1, rfbServerFormat.trueColour==1,
+      rfbServerFormat.redMax, rfbServerFormat.greenMax,
+      rfbServerFormat.blueMax, rfbServerFormat.redShift,
+      rfbServerFormat.greenShift, rfbServerFormat.blueShift);
+
+    PixelFormat cpf(cl->format.bitsPerPixel, cl->format.depth,
+      cl->format.bigEndian==1, cl->format.trueColour==1, cl->format.redMax,
+      cl->format.greenMax, cl->format.blueMax, cl->format.redShift,
+      cl->format.greenShift, cl->format.blueShift);
+    clientPF = cpf;
+
+    if (!fb) fb = new FullFramePixelBuffer(serverPF, rfbScreen.width,
+      rfbScreen.height, (rdr::U8 *)rfbScreen.pfbMemory, NULL);
+
+    image_getter.init(fb, clientPF, NULL);
+
+    rfbos.setptr((rdr::U8 *)&updateBuf[ublen]);
+
     if (compareFB) {
-      PixelFormat spf(rfbServerFormat.bitsPerPixel, rfbServerFormat.depth,
-        rfbServerFormat.bigEndian==1, rfbServerFormat.trueColour==1,
-        rfbServerFormat.redMax, rfbServerFormat.greenMax,
-        rfbServerFormat.blueMax, rfbServerFormat.redShift,
-        rfbServerFormat.greenShift, rfbServerFormat.blueShift);
-      if (!fb) fb = new FullFramePixelBuffer(spf, rfbScreen.width,
-        rfbScreen.height, (rdr::U8 *)rfbScreen.pfbMemory, NULL);
       if (!cut) cut = new ComparingUpdateTracker(fb);
       rfb::Region changed;
       cut->compareRect(r, &changed);
@@ -93,6 +107,8 @@ Bool rfbSendRectEncodingTight(rfbClientPtr _cl, int x, int y, int w, int h)
       }
     }
     else te->writeRect(r, &image_getter, NULL);
+
+    ublen = rfbos.getptr() - (rdr::U8 *)updateBuf;
   }
   catch (rdr::Exception e) {
     fprintf(stderr, "ERROR: %s\n", e.str());

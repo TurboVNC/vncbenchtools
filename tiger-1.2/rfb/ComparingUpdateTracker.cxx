@@ -38,6 +38,15 @@ ComparingUpdateTracker::~ComparingUpdateTracker()
 
 void ComparingUpdateTracker::compareRect(const Rect& r, Region* newChanged)
 {
+  if (!r.enclosed_by(fb->getRect())) {
+    Rect safe;
+    // Crop the rect and try again
+    safe = r.intersect(fb->getRect());
+    if (!safe.is_empty())
+      compareRect(safe, newChanged);
+    return;
+  }
+
   if (firstCompare) {
     // NB: We leave the change region untouched on this iteration,
     // since in effect the entire framebuffer has changed.
@@ -49,14 +58,10 @@ void ComparingUpdateTracker::compareRect(const Rect& r, Region* newChanged)
       oldFb.imageRect(pos, srcData, srcStride);
     }
     firstCompare = false;
-  }
 
-  if (!r.enclosed_by(fb->getRect())) {
-    Rect safe;
-    // Crop the rect and try again
-    safe = r.intersect(fb->getRect());
-    if (!safe.is_empty())
-      compareRect(safe, newChanged);
+    Region temp;
+    temp.reset(fb->getRect());
+    newChanged->assign_union(temp);
     return;
   }
 

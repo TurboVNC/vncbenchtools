@@ -128,7 +128,7 @@ void InitEverything (int color_depth)
 
   image->width = 1280;
   image->height = 1024;
-  image->bits_per_pixel = rfbClient.format.bitsPerPixel;
+  image->bits_per_pixel = rfbServerFormat.bitsPerPixel;
   image->bytes_per_line = ((image->width * image->bits_per_pixel / 8) + 3) & (~3);
   image->data = (char *)malloc(image->width * image->bytes_per_line);
 

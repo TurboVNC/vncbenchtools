@@ -1,5 +1,5 @@
 /* Copyright (C) 2000-2003 Constantin Kaplinsky.  All Rights Reserved.
- * Copyright (C) 2011 D. R. Commander.  All Rights Reserved.
+ * Copyright (C) 2011, 2014 D. R. Commander.  All Rights Reserved.
  *    
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,8 +20,15 @@
 #include <rfb/encodings.h>
 #include <rfb/Exception.h>
 #include <rfb/TightEncoder.h>
+#include <rdr/RFBOutStream.h>
+#include "rfb.h"
+
+extern rfbClientPtr cl;
+extern rdr::RFBOutStream rfbos;
 
 using namespace rfb;
+
+extern PixelFormat clientPF;
 
 // Minimum amount of data to be compressed. This value should not be
 // changed, doing so will break compatibility with existing clients.
@@ -73,7 +80,8 @@ const TIGHT_CONF TightEncoder::conf[10] = {
   { 65536, 2048,  24, 9, 9, 7,  64, 96, 92, SUBSAMP_NONE }, // 8
   { 65536, 2048,  32, 9, 9, 9,  96, 96,100, SUBSAMP_NONE }  // 9
 };
-const int TightEncoder::defaultCompressLevel = 1;
+
+const int TightEncoder::defaultCompressLevel = 2;
 
 //
 // Including BPP-dependent implementation of the encoder.
@@ -260,17 +268,8 @@ bool TightEncoder::writeRect(const Rect& _r, TransImageGetter* _ig,
                              Rect* actual)
 {
   ig = _ig;
-  PixelFormat cpf(cl->format.bitsPerPixel, cl->format.depth,
-    cl->format.bigEndian==1, cl->format.trueColour==1, cl->format.redMax,
-    cl->format.greenMax, cl->format.blueMax, cl->format.redShift,
-    cl->format.greenShift, cl->format.blueShift);
-  clientpf = cpf;
-  PixelFormat spf(rfbServerFormat.bitsPerPixel, rfbServerFormat.depth,
-    rfbServerFormat.bigEndian==1, rfbServerFormat.trueColour==1,
-    rfbServerFormat.redMax, rfbServerFormat.greenMax,
-    rfbServerFormat.blueMax, rfbServerFormat.redShift,
-    rfbServerFormat.greenShift, rfbServerFormat.blueShift);
-  serverpf = spf;
+  serverpf = ig->getPixelBuffer()->getPF();
+  clientpf = clientPF;
 
   // Shortcuts to rectangle coordinates and dimensions.
   Rect r = _r;
@@ -375,10 +374,6 @@ void TightEncoder::writeSubrect(const Rect& r, bool forceSolid)
 {
   mos.clear();
 
-    /* Send pending data if there is more than 128 bytes. */
-  if(ublen > 128)
-    if(!rfbSendUpdateBuf(cl)) throw Exception("rfbSendUpdateBuf() failed");
-
   switch (clientpf.bpp) {
   case 8:
     tightEncode8(r, &mos, forceSolid);  break;
@@ -389,31 +384,17 @@ void TightEncoder::writeSubrect(const Rect& r, bool forceSolid)
   }
 
   rfbFramebufferUpdateRectHeader rect;
-  if(ublen + sz_rfbFramebufferUpdateRectHeader > UPDATE_BUF_SIZE)
-    if(!rfbSendUpdateBuf(cl)) throw Exception("rfbSendUpdateBuf() failed");
 
   rect.r.x = Swap16IfLE(r.tl.x);
   rect.r.y = Swap16IfLE(r.tl.y);
   rect.r.w = Swap16IfLE(r.width());
   rect.r.h = Swap16IfLE(r.height());
   rect.encoding = Swap32IfLE(rfbEncodingTight);
-  memcpy(&updateBuf[ublen], (char *)&rect, sz_rfbFramebufferUpdateRectHeader);
-  ublen += sz_rfbFramebufferUpdateRectHeader;
 
+  rfbos.writeBytes(&rect, sz_rfbFramebufferUpdateRectHeader);
   cl->rfbRectanglesSent[rfbEncodingTight]++;
   cl->rfbBytesSent[rfbEncodingTight] += sz_rfbFramebufferUpdateRectHeader;
 
-  int portionLen = UPDATE_BUF_SIZE;
-  int compressedLen = mos.length();
-  char *buf = (char *)mos.data();
-  for(int i = 0; i < compressedLen; i += portionLen) {
-    if(i + portionLen > compressedLen) {
-       portionLen = compressedLen - i;
-    }
-    if(ublen + portionLen > UPDATE_BUF_SIZE)
-      if(!rfbSendUpdateBuf(cl)) throw Exception("rfbSendUpdateBuf() failed");
-    memcpy(&updateBuf[ublen], &buf[i], portionLen);
-    ublen += portionLen;
-  }
-  cl->rfbBytesSent[rfbEncodingTight] += compressedLen;
+  rfbos.writeBytes(mos.data(), mos.length());
+  cl->rfbBytesSent[rfbEncodingTight] += mos.length();
 }
