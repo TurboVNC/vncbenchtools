@@ -1,5 +1,6 @@
 /* Copyright (C) 2002-2005 RealVNC Ltd.  All Rights Reserved.
  * Copyright 2014 Pierre Ossman for Cendio AB
+ * Copyright (C) 2014 D. R. Commander.  All Rights Reserved.
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,6 +22,8 @@
 #include <rfb/PixelBuffer.h>
 #include <rfb/Palette.h>
 
+extern int solidrect, solidpixels;
+
 using namespace rfb;
 
 Encoder::Encoder(int encoding_,
@@ -37,6 +40,8 @@ Encoder::~Encoder()
 void Encoder::writeSolidRect(int width, int height,
                              const PixelFormat& pf, const rdr::U8* colour)
 {
+  solidrect++;  solidpixels += width * height;
+
   ManagedPixelBuffer buffer(pf, width, height);
   Pixel pixel;
 

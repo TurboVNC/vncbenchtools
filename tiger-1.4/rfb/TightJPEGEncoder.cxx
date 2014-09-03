@@ -134,6 +134,7 @@ void TightJPEGEncoder::writeRect(const PixelBuffer* pb, const Palette& palette)
   os = &rfbos;
 
   os->writeU8(tightJpeg << 4);
+  cl->rfbBytesSent[encodingTight]++;
 
   writeCompact(jc.length(), os);
   os->writeBytes(jc.data(), jc.length());
@@ -160,14 +161,18 @@ void TightJPEGEncoder::writeCompact(rdr::U32 value, rdr::OutStream* os)
   b = value & 0x7F;
   if (value <= 0x7F) {
     os->writeU8(b);
+    cl->rfbBytesSent[encodingTight]++;
   } else {
     os->writeU8(b | 0x80);
+    cl->rfbBytesSent[encodingTight]++;
     b = value >> 7 & 0x7F;
     if (value <= 0x3FFF) {
       os->writeU8(b);
+      cl->rfbBytesSent[encodingTight]++;
     } else {
       os->writeU8(b | 0x80);
       os->writeU8(value >> 14 & 0xFF);
+      cl->rfbBytesSent[encodingTight] += 2;
     }
   }
 }

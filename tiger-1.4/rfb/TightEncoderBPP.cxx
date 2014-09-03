@@ -44,12 +44,14 @@ void TightEncoder::writeMonoRect(int width, int height,
 
   os->writeU8((streamId | tightExplicitFilter) << 4);
   os->writeU8(tightFilterPalette);
+  cl->rfbBytesSent[encodingTight] += 2;
 
   // Write the palette
   pal[0] = (rdr::UBPP)palette.getColour(0);
   pal[1] = (rdr::UBPP)palette.getColour(1);
 
   os->writeU8(1);
+  cl->rfbBytesSent[encodingTight]++;
   writePixels((rdr::U8*)pal, pf, 2, os);
 
   // Set up compression
@@ -74,6 +76,7 @@ void TightEncoder::writeMonoRect(int width, int height,
       }
       if (bg_bits == 8) {
         zos->writeU8(0);
+        if (zos == &rfbos) cl->rfbBytesSent[encodingTight]++;
         continue;
       }
       mask = 0x80 >> bg_bits;
@@ -85,6 +88,7 @@ void TightEncoder::writeMonoRect(int width, int height,
         }
       }
       zos->writeU8(value);
+      if (zos == &rfbos) cl->rfbBytesSent[encodingTight]++;
     }
 
     if (x < width) {
@@ -98,6 +102,7 @@ void TightEncoder::writeMonoRect(int width, int height,
         mask >>= 1;
       }
       zos->writeU8(value);
+      if (zos == &rfbos) cl->rfbBytesSent[encodingTight]++;
     }
 
     buffer += pad;
@@ -133,12 +138,14 @@ void TightEncoder::writeIndexedRect(int width, int height,
 
   os->writeU8((streamId | tightExplicitFilter) << 4);
   os->writeU8(tightFilterPalette);
+  cl->rfbBytesSent[encodingTight] += 2;
 
   // Write the palette
   for (int i = 0; i < palette.size(); i++)
     pal[i] = (rdr::UBPP)palette.getColour(i);
 
   os->writeU8(palette.size() - 1);
+  cl->rfbBytesSent[encodingTight]++;
   writePixels((rdr::U8*)pal, pf, palette.size(), os);
 
   // Set up compression
@@ -158,6 +165,7 @@ void TightEncoder::writeIndexedRect(int width, int height,
         idx = palette.lookup(*buffer);
       }
       zos->writeU8(idx);
+      if (zos == &rfbos) cl->rfbBytesSent[encodingTight]++;
       buffer++;
     }
     buffer += pad;
