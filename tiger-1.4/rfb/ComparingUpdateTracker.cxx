@@ -25,9 +25,8 @@
 using namespace rfb;
 
 ComparingUpdateTracker::ComparingUpdateTracker(PixelBuffer* buffer)
-  : fb(buffer), oldFb(fb->getPF(), 0, 0), firstCompare(true), enabled(true)
+  : fb(buffer), oldFb(fb->getPF(), 0, 0), firstCompare(true)
 {
-    changed.assign_union(fb->getRect());
 }
 
 ComparingUpdateTracker::~ComparingUpdateTracker()
@@ -37,13 +36,16 @@ ComparingUpdateTracker::~ComparingUpdateTracker()
 
 #define BLOCK_SIZE 64
 
-bool ComparingUpdateTracker::compare()
+void ComparingUpdateTracker::compareRect(const Rect& r, Region* newChanged)
 {
-  std::vector<Rect> rects;
-  std::vector<Rect>::iterator i;
-
-  if (!enabled)
-    return false;
+  if (!r.enclosed_by(fb->getRect())) {
+    Rect safe;
+    // Crop the rect and try again
+    safe = r.intersect(fb->getRect());
+    if (!safe.is_empty())
+      compareRect(safe, newChanged);
+    return;
+  }
 
   if (firstCompare) {
     // NB: We leave the change region untouched on this iteration,
@@ -59,48 +61,9 @@ bool ComparingUpdateTracker::compare()
 
     firstCompare = false;
 
-    return false;
-  }
-
-  copied.get_rects(&rects, copy_delta.x<=0, copy_delta.y<=0);
-  for (i = rects.begin(); i != rects.end(); i++)
-    oldFb.copyRect(*i, copy_delta);
-
-  changed.get_rects(&rects);
-
-  Region newChanged;
-  for (i = rects.begin(); i != rects.end(); i++)
-    compareRect(*i, &newChanged);
-
-  if (changed.equals(newChanged))
-    return false;
-
-  changed = newChanged;
-
-  return true;
-}
-
-void ComparingUpdateTracker::enable()
-{
-  enabled = true;
-}
-
-void ComparingUpdateTracker::disable()
-{
-  enabled = false;
-
-  // Make sure we update the framebuffer next time we get enabled
-  firstCompare = true;
-}
-
-void ComparingUpdateTracker::compareRect(const Rect& r, Region* newChanged)
-{
-  if (!r.enclosed_by(fb->getRect())) {
-    Rect safe;
-    // Crop the rect and try again
-    safe = r.intersect(fb->getRect());
-    if (!safe.is_empty())
-      compareRect(safe, newChanged);
+    Region temp;
+    temp.reset(fb->getRect());
+    newChanged->assign_union(temp);
     return;
   }
 

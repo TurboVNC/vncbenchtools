@@ -13,7 +13,6 @@ set(SOURCES
   rfb/TightDecoder.cxx
   rfb/TightEncoder.cxx
   rfb/TightJPEGEncoder.cxx
-  rfb/UpdateTracker.cxx
   Xregion/Region.c)
 
 add_library(tigervnc ${SOURCES})
