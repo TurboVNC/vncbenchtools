@@ -5,6 +5,12 @@ include(CheckCSourceRuns)
 
 project(vncbenchtools)
 
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
+
 set(ENCODER_OPTIONS
   "tight-1.1, tight-1.3.9, turbo-0.4, turbo-0.5, turbo-1.0, turbo-1.1, tiger-1.1, tiger-1.2, tiger-1.4, h264")
 
