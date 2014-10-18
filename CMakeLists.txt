@@ -87,6 +87,10 @@ if(ENCODER MATCHES tig* OR DECODER MATCHES tig*)
   include_directories(${JPEG_INCLUDE_DIR})
 endif()
 
+if(ENCODER MATCHES turbo-1.1)
+  add_definitions(-DICE_SUPPORTED)
+endif()
+
 if(ENCODER MATCHES turbo-* OR ENCODER MATCHES h264 OR DECODER MATCHES turbo-*)
   include(cmakescripts/FindTurboJPEG.cmake)
   set(LINK_LIBRARIES ${LINK_LIBRARIES} ${TJPEG_LIBRARY})

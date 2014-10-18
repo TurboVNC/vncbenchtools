@@ -248,6 +248,8 @@ static int parse_fb_update (FILE *in);
 
 static int parse_rectangle (FILE *in, int xpos, int ypos,
                             int width, int height, int rect_no, int enc);
+static int send_rectangle (int xpos, int ypos, int width, int height,
+                           int rect_no, int pixel_bytes);
 
 #ifdef SAVE_PPM_FILES
 static int save_rectangle (FILE *ppm, int width, int height, int depth);
@@ -273,6 +275,10 @@ static unsigned long total_pixels;
 static int tightonly = 0;
 static int verbose = 0;
 static int flip_rgb = 0;
+#ifdef ICE_SUPPORTED
+static int interframe = 0;
+static int rfbICEBlockSize = 64;
+#endif
 int decompress = 0;
 FILE *out = NULL;
 char *outfilename = NULL;
@@ -309,6 +315,10 @@ int main (int argc, char *argv[])
       flip_rgb = 1;
     } else if (strcmp (argv[i], "-v") == 0) {
       verbose = 1;
+#ifdef ICE_SUPPORTED
+    } else if (strcmp (argv[i], "-ice") == 0) {
+      interframe = 1;
+#endif
     } else filename = argv[i];
   }
 
@@ -358,11 +368,22 @@ int main (int argc, char *argv[])
 
 static void show_usage (char *program_name)
 {
-  fprintf (stderr,
-           "Usage: %s [-8|-16|-24] [INPUT_FILE]\n"
-           "\n"
-           "If the INPUT_FILE name is not provided, standard input is used.\n",
-           program_name);
+  fprintf (stderr, "\n");
+  fprintf (stderr, "USAGE: %s <-8|-16|-24> [options] [INPUT_FILE]\n\n", program_name);
+  fprintf (stderr, "If INPUT_FILE is not specified, then standard input is used.\n\n");
+  fprintf (stderr, "-8/-16/-24 = Specify bit depth of the RFB session capture stored in INPUT_FILE\n");
+  fprintf (stderr, "             or passed via stdin\n\n");
+  fprintf (stderr, "Options:\n");
+  fprintf (stderr, "-to = Only benchmark Tight encoding/decoding\n");
+  fprintf (stderr, "-d = Benchmark decoding instead of encoding\n");
+  fprintf (stderr, "-o <filename> = Store Tight-encoded session in <filename>\n");
+  fprintf (stderr, "                (for later playback in the TurboVNC Viewer)\n");
+  fprintf (stderr, "-r = Reverse red/blue channels when reading the RFB session capture\n");
+  fprintf (stderr, "-v = Verbose mode (show the size and ID of each encoded rectangle)\n");
+#ifdef ICE_SUPPORTED
+  fprintf (stderr, "-ice = Enable interframe comparison engine\n");
+#endif
+  fprintf (stderr, "\n");
 }
 
 static int do_convert (FILE *in)
@@ -371,6 +392,13 @@ static int do_convert (FILE *in)
   char buf[8];
 
   InitEverything (color_depth);
+#ifdef ICE_SUPPORTED
+  if (interframe) {
+    if (!InterframeOn(&rfbClient))
+      return -1;
+  } else
+#endif
+  rfbClient.fb = rfbScreen.pfbMemory;
 
 #ifdef LAZY_TIGHT
   rfbTightDisableGradient = TRUE;
@@ -478,7 +506,7 @@ static int parse_fb_update (FILE *in)
   rfbFramebufferUpdateRectHeader rh;
   CARD16 rect_count;
   CARD16 xpos, ypos, width, height;
-  int i;
+  int i, update_rects = 0;
   CARD32 enc;
 
   memset(&msg, 0, sz_rfbFramebufferUpdateMsg);
@@ -494,6 +522,7 @@ static int parse_fb_update (FILE *in)
     return False;
 
   for (i = 0; i < rect_count; i++) {
+    int ret;
     if (fread (&rh, 1, sz_rfbFramebufferUpdateRectHeader, in)
 	!= sz_rfbFramebufferUpdateRectHeader) {
       fprintf (stderr, "Read error.\n");
@@ -507,8 +536,23 @@ static int parse_fb_update (FILE *in)
 
     enc = get_CARD32 ((char *)&rh.encoding);
 
-    parse_rectangle(in, xpos, ypos, width, height, i, enc);
+    ret = parse_rectangle(in, xpos, ypos, width, height, i, enc);
+    if (ret < 0) return -1;
+    else update_rects += (1 - ret);
+
     total_rects++;
+  }
+
+  /* The Windows TurboVNC Viewer (and probably some other VNC viewers as
+     well) will ignore any empty FBUs and stop sending FBURs when it
+     receives one.  If CU is not active, then this causes the viewer to
+     stop receiving updates until something else, such as a mouse cursor
+     change, triggers a new FBUR.  Thus, if the ICE culls all of the
+     pixels in this update, we send a 1-pixel FBU rather than an empty
+     one. */
+  if (update_rects < 1) {
+    if (send_rectangle(0, 0, 1, 1, 0, color_depth / 8) < 0)
+      return -1;
   }
 
   if (out) {
@@ -526,10 +570,10 @@ static int parse_fb_update (FILE *in)
 static int parse_rectangle (FILE *in, int xpos, int ypos,
                             int width, int height, int rect_no, int enc)
 {
+  int err;
 #ifdef SAVE_PPM_FILES
   char fname[80];  FILE *ppm;
 #endif
-  int err, i;
   int pixel_bytes;
 
   if (enc == 5) {
@@ -578,6 +622,64 @@ static int parse_rectangle (FILE *in, int xpos, int ypos,
     fclose (ppm);
   }
 #endif
+
+#ifdef ICE_SUPPORTED
+  if (rfbClient.compareFB) {
+    int pitch = rfbScreen.paddedWidthInBytes;
+    int ps = rfbServerFormat.bitsPerPixel / 8;
+    char *src = &rfbScreen.pfbMemory[ypos * pitch + xpos * ps];
+    char *dst = &rfbClient.compareFB[ypos * pitch + xpos * ps];
+    char *srcRowPtr, *dstRowPtr, *srcColPtr, *dstColPtr;
+    int row, col;
+    Bool empty = TRUE;
+
+    for (row = 0, srcRowPtr = src, dstRowPtr = dst;
+         row < height;
+         row += rfbICEBlockSize, srcRowPtr += pitch * rfbICEBlockSize,
+           dstRowPtr += pitch * rfbICEBlockSize) {
+
+      for (col = 0, srcColPtr = srcRowPtr, dstColPtr = dstRowPtr;
+           col < width;
+           col += rfbICEBlockSize, srcColPtr += ps * rfbICEBlockSize,
+             dstColPtr += ps * rfbICEBlockSize) {
+
+        Bool different = FALSE;
+        int compareWidth = min(rfbICEBlockSize, width - col);
+        int compareHeight = min(rfbICEBlockSize, height - row);
+        int rows = compareHeight;
+        char *srcPtr = srcColPtr, *dstPtr = dstColPtr;
+
+        while (rows--) {
+          if (rfbClient.firstCompare ||
+              memcmp(srcPtr, dstPtr, compareWidth * ps)) {
+            memcpy(dstPtr, srcPtr, compareWidth * ps);
+            different = TRUE;
+          }
+          srcPtr += pitch;
+          dstPtr += pitch;
+        }
+        if (different) {
+          if (send_rectangle(xpos + col, ypos + row, compareWidth,
+                             compareHeight, rect_no, pixel_bytes) < 0)
+            return -1;
+          empty = FALSE;
+        }
+      }
+    }
+    rfbClient.firstCompare = FALSE;
+
+    if (empty) return 1;
+    else return 0;
+
+  } else
+#endif
+    return send_rectangle(xpos, ypos, width, height, rect_no, pixel_bytes);
+}
+
+static int send_rectangle (int xpos, int ypos,
+                           int width, int height, int rect_no, int pixel_bytes)
+{
+  int err, i;
 
   rfbClient.rfbBytesSent[rfbEncodingHextile] = 0;
   rfbClient.rfbRectanglesSent[rfbEncodingHextile] = 0;
@@ -1021,4 +1123,3 @@ static CARD16 get_CARD16 (char *ptr)
 {
   return (CARD16) ntohs (*(unsigned short *)ptr);
 }
-

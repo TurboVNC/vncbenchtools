@@ -119,6 +119,13 @@ typedef struct rfbClientRec {
 
     Bool reset;
 
+#ifdef ICE_SUPPORTED
+    /* Interframe comparison */
+    char *compareFB;
+    Bool firstCompare;
+#endif
+    char *fb;
+
 } rfbClientRec, *rfbClientPtr;
 
 extern rfbClientRec rfbClient;
@@ -225,9 +232,15 @@ extern Bool rfbSendRectEncodingZlib(rfbClientPtr cl, int x, int y, int w,
 
 /*  */
 
+#ifdef ICE_SUPPORTED
+extern Bool InterframeOn(rfbClientPtr cl);
+#endif
+
 extern void InitEverything (int color_depth);
 
 extern int rfbLog (char *fmt, ...);
+
+extern void rfbLogPerror(char *str);
 
 extern Bool rfbSendRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
 

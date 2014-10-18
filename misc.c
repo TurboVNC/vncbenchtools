@@ -37,6 +37,24 @@ rfbPixelFormat rfbServerFormat;
 
 XImage _image, *image=&_image;
 
+#ifdef ICE_SUPPORTED
+Bool InterframeOn(rfbClientPtr cl)
+{
+  if (!cl->compareFB) {
+    if (!(cl->compareFB = (char *)malloc(rfbScreen.paddedWidthInBytes *
+                                         rfbScreen.height))) {
+      rfbLogPerror("InterframeOn: couldn't allocate comparison buffer");
+      return FALSE;
+    }
+    memset(cl->compareFB, 0, rfbScreen.paddedWidthInBytes * rfbScreen.height);
+    cl->firstCompare = TRUE;
+    rfbLog("Interframe comparison enabled\n");
+  }
+  cl->fb = cl->compareFB;
+  return TRUE;
+}
+#endif
+
 void InitEverything (int color_depth)
 {
   memset(&rfbClient, 0, sizeof(rfbClient));
@@ -53,7 +71,7 @@ void InitEverything (int color_depth)
   #ifdef _BIG_ENDIAN
   rfbServerFormat.bigEndian = 1;
   #else
-  rfbServerFormat.bigEndian = 0; 
+  rfbServerFormat.bigEndian = 0;
   #endif
   rfbServerFormat.trueColour = 1;
   rfbScreen.bitsPerPixel = rfbClient.format.bitsPerPixel;
@@ -189,6 +207,12 @@ int rfbLog (char *fmt, ...)
   return 0;
 }
 
+void rfbLogPerror(char *str)
+{
+  rfbLog("");
+  perror(str);
+}
+
 Bool
 rfbSendRectEncodingRaw(cl, x, y, w, h)
     rfbClientPtr cl;
@@ -205,7 +229,7 @@ WriteToSessionCapture(char *buf, int len)
   if (out && len > 0) {
     int written = -1;
     if ((written = fwrite(buf, len, 1, out)) < 1) {
-      perror("Cannot write to output file"); 
+      perror("Cannot write to output file");
       return False;
     }
   }

@@ -35,7 +35,7 @@ static int imageQualityLevel = 0;
 
 
 #define GET_IMAGE_INTO_BUF(tx,ty,tw,th,buf)                                \
-{  char *fbptr = (rfbScreen.pfbMemory                                      \
+{  char *fbptr = (cl->fb                                                   \
                  + (rfbScreen.paddedWidthInBytes * ty)                     \
                  + (tx * (rfbScreen.bitsPerPixel / 8)));                   \
                                                                            \
