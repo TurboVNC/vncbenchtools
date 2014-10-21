@@ -633,36 +633,56 @@ static int parse_rectangle (FILE *in, int xpos, int ypos,
     int row, col;
     Bool empty = TRUE;
 
-    for (row = 0, srcRowPtr = src, dstRowPtr = dst;
-         row < height;
-         row += rfbICEBlockSize, srcRowPtr += pitch * rfbICEBlockSize,
-           dstRowPtr += pitch * rfbICEBlockSize) {
-
-      for (col = 0, srcColPtr = srcRowPtr, dstColPtr = dstRowPtr;
-           col < width;
-           col += rfbICEBlockSize, srcColPtr += ps * rfbICEBlockSize,
-             dstColPtr += ps * rfbICEBlockSize) {
-
-        Bool different = FALSE;
-        int compareWidth = min(rfbICEBlockSize, width - col);
-        int compareHeight = min(rfbICEBlockSize, height - row);
-        int rows = compareHeight;
-        char *srcPtr = srcColPtr, *dstPtr = dstColPtr;
-
-        while (rows--) {
-          if (rfbClient.firstCompare ||
-              memcmp(srcPtr, dstPtr, compareWidth * ps)) {
-            memcpy(dstPtr, srcPtr, compareWidth * ps);
-            different = TRUE;
-          }
-          srcPtr += pitch;
-          dstPtr += pitch;
+    if (rfbICEBlockSize == 0) {
+      Bool different = FALSE;
+      int rows = height;
+      while (rows--) {
+        if (rfbClient.firstCompare || memcmp(src, dst, width * ps)) {
+          memcpy(dst, src, width * ps);
+          different = TRUE;
         }
-        if (different) {
-          if (send_rectangle(xpos + col, ypos + row, compareWidth,
-                             compareHeight, rect_no, pixel_bytes) < 0)
-            return -1;
-          empty = FALSE;
+        src += pitch;
+        dst += pitch;
+      }
+      if (different) {
+        if (send_rectangle(xpos, ypos, width, height, rect_no,
+                           pixel_bytes) < 0)
+          return -1;
+        empty = FALSE;
+      }
+    }
+    else {
+      for (row = 0, srcRowPtr = src, dstRowPtr = dst;
+           row < height;
+           row += rfbICEBlockSize, srcRowPtr += pitch * rfbICEBlockSize,
+             dstRowPtr += pitch * rfbICEBlockSize) {
+
+        for (col = 0, srcColPtr = srcRowPtr, dstColPtr = dstRowPtr;
+             col < width;
+             col += rfbICEBlockSize, srcColPtr += ps * rfbICEBlockSize,
+               dstColPtr += ps * rfbICEBlockSize) {
+
+          Bool different = FALSE;
+          int compareWidth = min(rfbICEBlockSize, width - col);
+          int compareHeight = min(rfbICEBlockSize, height - row);
+          int rows = compareHeight;
+          char *srcPtr = srcColPtr, *dstPtr = dstColPtr;
+
+          while (rows--) {
+            if (rfbClient.firstCompare ||
+                memcmp(srcPtr, dstPtr, compareWidth * ps)) {
+              memcpy(dstPtr, srcPtr, compareWidth * ps);
+              different = TRUE;
+            }
+            srcPtr += pitch;
+            dstPtr += pitch;
+          }
+          if (different) {
+            if (send_rectangle(xpos + col, ypos + row, compareWidth,
+                               compareHeight, rect_no, pixel_bytes) < 0)
+              return -1;
+            empty = FALSE;
+          }
         }
       }
     }
