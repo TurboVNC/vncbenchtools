@@ -633,6 +633,7 @@ static int parse_rectangle (FILE *in, int xpos, int ypos,
     char *srcRowPtr, *dstRowPtr, *srcColPtr, *dstColPtr;
     int row, col;
     Bool empty = TRUE;
+    double tCompare0 = gettime(), tEncode = 0.0;
 
     if (rfbICEBlockSize == 0) {
       Bool different = FALSE;
@@ -646,9 +647,11 @@ static int parse_rectangle (FILE *in, int xpos, int ypos,
         dst += pitch;
       }
       if (different) {
+        double tEncode0 = gettime();
         if (send_rectangle(xpos, ypos, width, height, rect_no,
                            pixel_bytes) < 0)
           return -1;
+        tEncode += gettime() - tEncode0;
         empty = FALSE;
       }
     }
@@ -679,13 +682,23 @@ static int parse_rectangle (FILE *in, int xpos, int ypos,
             dstPtr += pitch;
           }
           if (different) {
+            double tEncode0 = gettime();
             if (send_rectangle(xpos + col, ypos + row, compareWidth,
                                compareHeight, rect_no, pixel_bytes) < 0)
               return -1;
+            tEncode += gettime() - tEncode0;
             empty = FALSE;
           }
         }
       }
+    }
+
+    if (!decompress) {
+      double tCompare = gettime() - tCompare0 - tEncode;
+      thextile[tndx] += tCompare;
+      tzlib[tndx] += tCompare;
+      tzrle[tndx] += tCompare;
+      ttight[tndx] += tCompare;
     }
 
     if (empty) return 1;
