@@ -524,7 +524,7 @@ static int parse_fb_update (FILE *in)
   for (i = 0; i < rect_count; i++) {
     int ret;
     if (fread (&rh, 1, sz_rfbFramebufferUpdateRectHeader, in)
-	!= sz_rfbFramebufferUpdateRectHeader) {
+        != sz_rfbFramebufferUpdateRectHeader) {
       fprintf (stderr, "Read error.\n");
       return -1;
     }
@@ -542,6 +542,7 @@ static int parse_fb_update (FILE *in)
 
     total_rects++;
   }
+  rfbClient.firstCompare = FALSE;
 
   /* The Windows TurboVNC Viewer (and probably some other VNC viewers as
      well) will ignore any empty FBUs and stop sending FBURs when it
@@ -624,7 +625,7 @@ static int parse_rectangle (FILE *in, int xpos, int ypos,
 #endif
 
 #ifdef ICE_SUPPORTED
-  if (rfbClient.compareFB) {
+  if (interframe && rfbClient.compareFB) {
     int pitch = rfbScreen.paddedWidthInBytes;
     int ps = rfbServerFormat.bitsPerPixel / 8;
     char *src = &rfbScreen.pfbMemory[ypos * pitch + xpos * ps];
@@ -686,7 +687,6 @@ static int parse_rectangle (FILE *in, int xpos, int ypos,
         }
       }
     }
-    rfbClient.firstCompare = FALSE;
 
     if (empty) return 1;
     else return 0;
