@@ -11,6 +11,21 @@ endif()
 
 message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 
+if(CMAKE_COMPILER_IS_GNUCC)
+  # Use the maximum optimization level for release builds
+  foreach(var CMAKE_C_FLAGS_RELEASE CMAKE_C_FLAGS_RELWITHDEBINFO)
+    if(${var} MATCHES "-O2")
+      string(REGEX REPLACE "-O2" "-O3" ${var} "${${var}}")
+    endif()
+  endforeach()
+endif()
+
+string(TOUPPER ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE_UC)
+set(EFFECTIVE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_${CMAKE_BUILD_TYPE_UC}}")
+
+message(STATUS "Compiler flags = ${EFFECTIVE_C_FLAGS}")
+message(STATUS "Linker flags = ${CMAKE_EXE_LINKER_FLAGS}")
+
 set(ENCODER_OPTIONS
   "tight-1.1, tight-1.3.9, turbo-0.4, turbo-0.5, turbo-1.0, turbo-1.1, tiger-1.1, tiger-1.2, tiger-1.4, h264")
 
