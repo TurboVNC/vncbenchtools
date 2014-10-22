@@ -630,7 +630,6 @@ static int parse_rectangle (FILE *in, int xpos, int ypos,
     int ps = rfbServerFormat.bitsPerPixel / 8;
     char *src = &rfbScreen.pfbMemory[ypos * pitch + xpos * ps];
     char *dst = &rfbClient.compareFB[ypos * pitch + xpos * ps];
-    char *srcRowPtr, *dstRowPtr, *srcColPtr, *dstColPtr;
     int row, col;
     Bool empty = TRUE;
     double tCompare0 = gettime(), tEncode = 0.0;
@@ -656,21 +655,15 @@ static int parse_rectangle (FILE *in, int xpos, int ypos,
       }
     }
     else {
-      for (row = 0, srcRowPtr = src, dstRowPtr = dst;
-           row < height;
-           row += rfbICEBlockSize, srcRowPtr += pitch * rfbICEBlockSize,
-             dstRowPtr += pitch * rfbICEBlockSize) {
-
-        for (col = 0, srcColPtr = srcRowPtr, dstColPtr = dstRowPtr;
-             col < width;
-             col += rfbICEBlockSize, srcColPtr += ps * rfbICEBlockSize,
-               dstColPtr += ps * rfbICEBlockSize) {
+      for (row = 0; row < height; row += rfbICEBlockSize) {
+        for (col = 0; col < width; col += rfbICEBlockSize) {
 
           Bool different = FALSE;
           int compareWidth = min(rfbICEBlockSize, width - col);
           int compareHeight = min(rfbICEBlockSize, height - row);
           int rows = compareHeight;
-          char *srcPtr = srcColPtr, *dstPtr = dstColPtr;
+          char *srcPtr = &src[row * pitch + col * ps];
+          char *dstPtr = &dst[row * pitch + col * ps];
 
           while (rows--) {
             if (rfbClient.firstCompare ||
