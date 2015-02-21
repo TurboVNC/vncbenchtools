@@ -43,7 +43,7 @@ namespace rdr {
     // itemSize bytes.  Returns the number of items which fit (up to a maximum
     // of nItems).
 
-    virtual int check(int itemSize, int nItems=1)
+    inline int check(int itemSize, int nItems=1)
     {
       if (ptr + itemSize * nItems > end) {
         if (ptr + itemSize > end)
@@ -56,11 +56,10 @@ namespace rdr {
 
     // writeU/SN() methods write unsigned and signed N-bit integers.
 
-    virtual void writeU8( U8  u) { check(1); *ptr++ = u; }
-    virtual void writeU16(U16 u) { check(2); *ptr++ = u >> 8; *ptr++ = (U8)u; }
-    virtual void writeU32(U32 u) { check(4); *ptr++ = u >> 24;
-                                             *ptr++ = u >> 16;
-                                             *ptr++ = u >> 8; *ptr++ = u; }
+    inline void writeU8( U8  u) { check(1); *ptr++ = u; }
+    inline void writeU16(U16 u) { check(2); *ptr++ = u >> 8; *ptr++ = (U8)u; }
+    inline void writeU32(U32 u) { check(4); *ptr++ = u >> 24; *ptr++ = u >> 16;
+                                            *ptr++ = u >> 8; *ptr++ = u; }
 
     inline void writeS8( S8  s) { writeU8((U8)s); }
     inline void writeS16(S16 s) { writeU16((U16)s); }

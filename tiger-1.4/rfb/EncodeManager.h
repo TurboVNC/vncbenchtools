@@ -51,8 +51,12 @@ namespace rfb {
 
     int computeNumRects(const Region& changed);
 
+    Encoder *startRect(const Rect& rect, int type);
+    void endRect();
+
     void writeCopyRects(const UpdateInfo& ui);
     void writeSolidRects(Region *changed, const PixelBuffer* pb);
+    void findSolidRect(const Rect& rect, Region *changed, const PixelBuffer* pb);
     void writeRects(const Region& changed, const PixelBuffer* pb);
 
     void writeSubRect(const Rect& rect, const PixelBuffer *pb);
@@ -93,6 +97,8 @@ namespace rfb {
   protected:
     std::vector<Encoder*> encoders;
     std::vector<int> activeEncoders;
+
+    int activeType;
 
     class OffsetPixelBuffer : public FullFramePixelBuffer {
     public:
