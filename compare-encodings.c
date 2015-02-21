@@ -542,7 +542,9 @@ static int parse_fb_update (FILE *in)
 
     total_rects++;
   }
+#ifdef ICE_SUPPORTED
   rfbClient.firstCompare = FALSE;
+#endif
 
   /* The Windows TurboVNC Viewer (and probably some other VNC viewers as
      well) will ignore any empty FBUs and stop sending FBURs when it
