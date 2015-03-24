@@ -27,7 +27,7 @@ message(STATUS "Compiler flags = ${EFFECTIVE_C_FLAGS}")
 message(STATUS "Linker flags = ${CMAKE_EXE_LINKER_FLAGS}")
 
 set(ENCODER_OPTIONS
-  "tight-1.1, tight-1.3.9, turbo-0.4, turbo-0.5, turbo-1.0, turbo-1.1, tiger-1.1, tiger-1.2, tiger-1.4, h264")
+  "tight-1.1, tight-1.3.9, turbo-0.4, turbo-0.5, turbo-1.0, turbo-1.1, turbo-h264, tiger-1.1, tiger-1.2, tiger-1.4, h264")
 
 set(ENCODER "" CACHE STRING
   "Which Tight/Turbo/Tiger encoder to use (one of ${ENCODER_OPTIONS})")
@@ -125,10 +125,13 @@ if(ENCODER MATCHES h264)
   set(X264_DIR ${DEFAULT_X264_DIR} CACHE PATH
     "Directory in which libx264 is installed (default: ${DEFAULT_X264_DIR})")
   message(STATUS "X264_DIR = ${X264_DIR}")
-  include_directories(${X264_DIR}/include ${CMAKE_SOURCE_DIR}/flv)
-  add_definitions(-DH264)
+  include_directories(${X264_DIR}/include)
+  if(ENCODER STREQUAL h264)
+    include_directories(${CMAKE_SOURCE_DIR}/flv)
+    add_definitions(-DH264)
+    set(SOURCES ${SOURCES} flv/flv.c flv/flv_bytestream.c)
+  endif()
   set(LINK_LIBRARIES ${LINK_LIBRARIES} ${X264_DIR}/lib/libx264.a m)
-  set(SOURCES ${SOURCES} flv/flv.c flv/flv_bytestream.c)
 endif()
 
 if(ENCODER MATCHES tiger-*)
