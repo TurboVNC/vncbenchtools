@@ -3,7 +3,7 @@
  *  $Id: compare-encodings.c,v 1.9 2011-10-07 09:15:45 dcommander Exp $
  *  Copyright (C) 2000 Const Kaplinsky <const@ce.cctpu.edu.ru>
  *  Copyright (C) 2008 Sun Microsystems, Inc.
- *  Copyright (C) 2010, 2012, 2014 D. R. Commander
+ *  Copyright (C) 2010, 2012, 2014, 2016 D. R. Commander
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -277,7 +277,7 @@ static int verbose = 0;
 static int flip_rgb = 0;
 #ifdef ICE_SUPPORTED
 static int interframe = 0;
-static int rfbICEBlockSize = 64;
+static int rfbICEBlockSize = 256;
 #endif
 int decompress = 0;
 FILE *out = NULL;
