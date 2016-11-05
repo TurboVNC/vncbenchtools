@@ -206,9 +206,7 @@ unsigned long solidrect = 0, solidpixels = 0, monorect = 0, monopixels = 0,
  */
 
 int
-rfbNumCodedRectsTight(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+rfbNumCodedRectsTight(rfbClientPtr cl, int x, int y, int w, int h)
 {
     int maxRectSize, maxRectWidth;
     int subrectMaxWidth, subrectMaxHeight;
@@ -312,8 +310,7 @@ ShutdownTightThreads(void)
 }
 
 static void *
-TightThreadFunc(param)
-    void *param;
+TightThreadFunc(void *param)
 {
     threadparam *t = (threadparam *)param;
     while (!t->deadyet) {
@@ -327,9 +324,7 @@ TightThreadFunc(param)
 
 
 static Bool
-CheckUpdateBuf(t, bytes)
-    threadparam *t;
-    int bytes;
+CheckUpdateBuf(threadparam *t, int bytes)
 {
     rfbClientPtr cl = t->cl;
     if (t->id == 0) {
@@ -349,9 +344,7 @@ CheckUpdateBuf(t, bytes)
 
 
 Bool
-rfbSendRectEncodingTight(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+rfbSendRectEncodingTight(rfbClientPtr cl, int x, int y, int w, int h)
 {
     Bool status = TRUE;
     int i, nt;
@@ -470,12 +463,10 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
 
 
 static Bool
-SendRectEncodingTight(t, x, y, w, h)
-    threadparam *t;
-    int x, y, w, h;
+SendRectEncodingTight(threadparam *t, int x, int y, int w, int h)
 {
     int nMaxRows;
-    CARD32 colorValue;
+    CARD32 colorValue = 0;
     int dx, dy, dw, dh;
     int x_best, y_best, w_best, h_best;
     char *fbptr;
@@ -610,11 +601,8 @@ SendRectEncodingTight(t, x, y, w, h)
 
 
 static void
-FindBestSolidArea(cl, x, y, w, h, colorValue, w_ptr, h_ptr)
-    rfbClientPtr cl;
-    int x, y, w, h;
-    CARD32 colorValue;
-    int *w_ptr, *h_ptr;
+FindBestSolidArea(rfbClientPtr cl, int x, int y, int w, int h,
+                  CARD32 colorValue, int *w_ptr, int *h_ptr)
 {
     int dx, dy, dw, dh;
     int w_prev;
@@ -653,11 +641,8 @@ FindBestSolidArea(cl, x, y, w, h, colorValue, w_ptr, h_ptr)
 
 
 static void
-ExtendSolidArea(cl, x, y, w, h, colorValue, x_ptr, y_ptr, w_ptr, h_ptr)
-    rfbClientPtr cl;
-    int x, y, w, h;
-    CARD32 colorValue;
-    int *x_ptr, *y_ptr, *w_ptr, *h_ptr;
+ExtendSolidArea(rfbClientPtr cl, int x, int y, int w, int h, CARD32 colorValue,
+                int *x_ptr, int *y_ptr, int *w_ptr, int *h_ptr)
 {
     int cx, cy;
 
@@ -701,11 +686,8 @@ ExtendSolidArea(cl, x, y, w, h, colorValue, x_ptr, y_ptr, w_ptr, h_ptr)
  */
 
 static Bool
-CheckSolidTile(cl, x, y, w, h, colorPtr, needSameColor)
-    rfbClientPtr cl;
-    int x, y, w, h;
-    CARD32 *colorPtr;
-    Bool needSameColor;
+CheckSolidTile(rfbClientPtr cl, int x, int y, int w, int h, CARD32 *colorPtr,
+               Bool needSameColor)
 {
     switch(rfbServerFormat.bitsPerPixel) {
     case 32:
@@ -756,9 +738,7 @@ DEFINE_CHECK_SOLID_FUNCTION(32)
 
 
 static Bool
-SendRectSimple(t, x, y, w, h)
-    threadparam *t;
-    int x, y, w, h;
+SendRectSimple(threadparam *t, int x, int y, int w, int h)
 {
     int maxBeforeSize, maxAfterSize;
     int maxRectSize, maxRectWidth;
@@ -813,9 +793,7 @@ SendRectSimple(t, x, y, w, h)
 
 
 static Bool
-SendSubrect(t, x, y, w, h)
-    threadparam *t;
-    int x, y, w, h;
+SendSubrect(threadparam *t, int x, int y, int w, int h)
 {
     char *fbptr;
     Bool success = FALSE;
@@ -915,9 +893,7 @@ SendSubrect(t, x, y, w, h)
 
 
 static Bool
-SendTightHeader(t, x, y, w, h)
-    threadparam *t;
-    int x, y, w, h;
+SendTightHeader(threadparam *t, int x, int y, int w, int h)
 {
     rfbFramebufferUpdateRectHeader rect;
 
@@ -946,8 +922,7 @@ SendTightHeader(t, x, y, w, h)
  */
 
 static Bool
-SendSolidRect(t)
-    threadparam *t;
+SendSolidRect(threadparam *t)
 {
     int len;
     rfbClientPtr cl = t->cl;
@@ -972,9 +947,7 @@ SendSolidRect(t)
 
 
 static Bool
-SendMonoRect(t, w, h)
-    threadparam *t;
-    int w, h;
+SendMonoRect(threadparam *t, int w, int h)
 {
     int streamId = t->streamId;
     int paletteLen, dataLen;
@@ -1049,9 +1022,7 @@ SendMonoRect(t, w, h)
 
 
 static Bool
-SendIndexedRect(t, w, h)
-    threadparam *t;
-    int w, h;
+SendIndexedRect(threadparam *t, int w, int h)
 {
     int streamId = t->streamId;
     int i, entryLen;
@@ -1125,9 +1096,7 @@ SendIndexedRect(t, w, h)
 
 
 static Bool
-SendFullColorRect(t, w, h)
-    threadparam *t;
-    int w, h;
+SendFullColorRect(threadparam *t, int w, int h)
 {
     int streamId = t->streamId;
     int len;
@@ -1163,9 +1132,8 @@ SendFullColorRect(t, w, h)
 
 
 static Bool
-CompressData(t, streamId, dataLen, zlibLevel, zlibStrategy)
-    threadparam *t;
-    int streamId, dataLen, zlibLevel, zlibStrategy;
+CompressData(threadparam *t, int streamId, int dataLen, int zlibLevel,
+             int zlibStrategy)
 {
     z_streamp pz;
     int err;
@@ -1231,10 +1199,7 @@ CompressData(t, streamId, dataLen, zlibLevel, zlibStrategy)
 }
 
 
-static Bool SendCompressedData(t, buf, compressedLen)
-    threadparam *t;
-    char *buf;
-    int compressedLen;
+static Bool SendCompressedData(threadparam *t, char *buf, int compressedLen)
 {
     int i, portionLen;
 
@@ -1271,9 +1236,7 @@ static Bool SendCompressedData(t, buf, compressedLen)
  */
 
 static void
-FillPalette8(t, count)
-    threadparam *t;
-    int count;
+FillPalette8(threadparam *t, int count)
 {
     CARD8 *data = (CARD8 *)t->tightBeforeBuf;
     CARD8 c0, c1;
@@ -1393,7 +1356,7 @@ FastFillPalette##bpp(t, data, w, pitch, h)                              \
     int w, pitch, h;                                                    \
 {                                                                       \
     CARD##bpp c0, c1, ci, mask, c0t, c1t, cit;                          \
-    int i, j, i2, j2, n0, n1, ni;                                       \
+    int i, j, i2 = 0, j2, n0, n1, ni;                                   \
     rfbClientPtr cl = t->cl;                                            \
                                                                         \
     if (cl->translateFn != rfbTranslateNone) {                          \
@@ -1497,8 +1460,7 @@ DEFINE_FAST_FILL_PALETTE_FUNCTION(32)
 
 
 static void
-PaletteReset(t)
-    threadparam *t;
+PaletteReset(threadparam *t)
 {
     t->paletteNumColors = 0;
     memset(t->palette.hash, 0, 256 * sizeof(COLOR_LIST *));
@@ -1506,11 +1468,7 @@ PaletteReset(t)
 
 
 static int
-PaletteInsert(t, rgb, numPixels, bpp)
-    threadparam *t;
-    CARD32 rgb;
-    int numPixels;
-    int bpp;
+PaletteInsert(threadparam *t, CARD32 rgb, int numPixels, int bpp)
 {
     COLOR_LIST *pnode;
     COLOR_LIST *prev_pnode = NULL;
@@ -1581,10 +1539,7 @@ PaletteInsert(t, rgb, numPixels, bpp)
  * Color components assumed to be byte-aligned.
  */
 
-static void Pack24(buf, fmt, count)
-    char *buf;
-    rfbPixelFormat *fmt;
-    int count;
+static void Pack24(char *buf, rfbPixelFormat *fmt, int count)
 {
     CARD32 *buf32;
     CARD32 pix;
@@ -1718,10 +1673,7 @@ DEFINE_MONO_ENCODE_FUNCTION(32)
  */
 
 static Bool
-SendJpegRect(t, x, y, w, h, quality)
-    threadparam *t;
-    int x, y, w, h;
-    int quality;
+SendJpegRect(threadparam *t, int x, int y, int w, int h, int quality)
 {
     unsigned char *srcbuf;
     int ps = rfbServerFormat.bitsPerPixel / 8;
