@@ -34,7 +34,7 @@ Bool rfbEconomicTranslate = FALSE;
  * Structure representing pixel format for RFB server (i.e. us).
  */
 
-rfbPixelFormat rfbServerFormat;
+extern rfbPixelFormat rfbServerFormat;
 
 
 /*
